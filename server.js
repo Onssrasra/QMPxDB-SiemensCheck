@@ -4,6 +4,9 @@ const helmet = require('helmet');
 const path = require('path');
 const multer = require('multer');
 const ExcelJS = require('exceljs');
+const { spawn } = require('child_process');
+const fs = require('fs').promises;
+const os = require('os');
 
 const {
   toNumber,
@@ -19,12 +22,11 @@ const { SiemensProductScraper, a2vUrl } = require('./scraper');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SCRAPE_CONCURRENCY = Number(process.env.SCRAPE_CONCURRENCY || 4);
-const WEIGHT_TOL_PCT = Number(process.env.WEIGHT_TOL_PCT || 0); // 0 = strikt
 
 // Ursprüngliche Spalten-Definition (für die Input-Erkennung)
 const ORIGINAL_COLS = { Z:'Z', E:'E', C:'C', S:'S', T:'T', U:'U', V:'V', W:'W', P:'P', N:'N' };
 
-// DB/Web-Spaltenpaare – hier definieren wir, nach welchen Originalspalten wir eine Web-Nachbarspalte einfügen
+// DB/Web-Spaltenpaare
 const DB_WEB_PAIRS = [
   { original: 'C', dbCol: null, webCol: null, label: 'Material-Kurztext' },
   { original: 'E', dbCol: null, webCol: null, label: 'Herstellartikelnummer' },
@@ -47,7 +49,7 @@ app.use(express.static(__dirname));
 
 const scraper = new SiemensProductScraper();
 
-// -------- Helpers: Spalten / Adressen ----------
+// -------- Helper Functions ----------
 function getColumnLetter(index) {
   let result = '';
   while (index > 0) {
@@ -57,6 +59,7 @@ function getColumnLetter(index) {
   }
   return result;
 }
+
 function getColumnIndex(letter) {
   let index = 0;
   for (let i = 0; i < letter.length; i++) {
@@ -65,12 +68,10 @@ function getColumnIndex(letter) {
   return index;
 }
 
-// -------- Layout-Berechnung / Struktur ----------
 function calculateNewColumnStructure(ws) {
   const newStructure = { pairs: [], otherCols: new Map(), totalInsertedCols: 0 };
   let insertedCols = 0;
 
-  // Für jedes DB/Web-Paar fügen wir rechts daneben 1 Spalte ein
   for (const pair of DB_WEB_PAIRS) {
     const originalIndex = getColumnIndex(pair.original);
     const adjustedOriginalIndex = originalIndex + insertedCols;
@@ -81,7 +82,6 @@ function calculateNewColumnStructure(ws) {
   }
   newStructure.totalInsertedCols = insertedCols;
 
-  // Andere Spalten passend verschieben (Mapping alt → neu)
   const lastCol = ws.lastColumn?.number || ws.columnCount || ws.getRow(HEADER_ROW).cellCount || 0;
   for (let colIndex = 1; colIndex <= lastCol; colIndex++) {
     const originalLetter = getColumnLetter(colIndex);
@@ -98,7 +98,6 @@ function calculateNewColumnStructure(ws) {
   return newStructure;
 }
 
-// -------- Formatierungen ----------
 function fillColor(ws, addr, color) {
   if (!color) return;
   const map = {
@@ -110,6 +109,7 @@ function fillColor(ws, addr, color) {
   };
   ws.getCell(addr).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: map[color] || map.green } };
 }
+
 function copyColumnFormatting(ws, fromCol, toCol, rowStart, rowEnd) {
   for (let row = rowStart; row <= rowEnd; row++) {
     const fromCell = ws.getCell(`${fromCol}${row}`);
@@ -121,6 +121,7 @@ function copyColumnFormatting(ws, fromCol, toCol, rowStart, rowEnd) {
     if (fromCell.style)     Object.assign(toCell.style, fromCell.style);
   }
 }
+
 function applyLabelCellFormatting(ws, addr, isWebCell = false) {
   const cell = ws.getCell(addr);
   fillColor(ws, addr, isWebCell ? 'webBlue' : 'dbBlue');
@@ -153,31 +154,25 @@ function eqDimension(exVal, webDimText, dimType){
   return exNum===webVal;
 }
 
-// -------- Top-Header (Zeile 1) --------
 function applyTopHeader(ws) {
-  // Fills (Hintergründe) sichern
   const b1Fill  = ws.getCell('B1').fill;
   const ag1Fill = ws.getCell('AG1').fill;
   const ah1Fill = ws.getCell('AH1').fill;
 
-  // evtl. vorhandene Merges lösen
   try { ws.unMergeCells('B1:AF1'); } catch {}
   try { ws.unMergeCells('AH1:AJ1'); } catch {}
 
-  // B1:AF1
   ws.mergeCells('B1:AF1');
   const b1 = ws.getCell('B1');
   b1.value = 'DB AG SAP R/3 K MARA Stammdaten Stand 20.Mai 2025';
   if (b1Fill) b1.fill = b1Fill;
   b1.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 
-  // AG1 (einzeln)
   const ag1 = ws.getCell('AG1');
   ag1.value = 'SAP Klassifizierung aus Okt24';
   if (ag1Fill) ag1.fill = ag1Fill;
   ag1.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 
-  // AH1:AJ1
   ws.mergeCells('AH1:AJ1');
   const ah1 = ws.getCell('AH1');
   ah1.value = 'Zusatz Herstellerdaten aus Abfragen in 2024';
@@ -185,36 +180,29 @@ function applyTopHeader(ws) {
   ah1.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 }
 
-// -------- NEU: Header-Zeilen 2 & 3 pro DB/Web-Paar zusammenfassen --------
 function mergePairHeaders(ws, pairs) {
   for (const pair of pairs) {
-    const dbCol  = pair.dbCol;   // Buchstabe, z.B. "C"
-    const webCol = pair.webCol;  // Buchstabe, z.B. "D"
+    const dbCol  = pair.dbCol;
+    const webCol = pair.webCol;
     if (!dbCol || !webCol) continue;
 
-    // Vorhandene Merges lösen (falls schon gemergt)
     try { ws.unMergeCells(`${dbCol}2:${webCol}2`); } catch {}
     try { ws.unMergeCells(`${dbCol}3:${webCol}3`); } catch {}
 
-    // Werte aus DB-Header holen (wir verwenden bewusst die DB-Seite als Quelle)
-    const v2 = ws.getCell(`${dbCol}2`).value; // technischer Code
-    const v3 = ws.getCell(`${dbCol}3`).value; // Klartext Spaltenname
+    const v2 = ws.getCell(`${dbCol}2`).value;
+    const v3 = ws.getCell(`${dbCol}3`).value;
 
-    // Merge durchführen
     ws.mergeCells(`${dbCol}2:${webCol}2`);
     ws.mergeCells(`${dbCol}3:${webCol}3`);
 
-    // Werte und Optik setzen (oben links der Merge-Range)
     const top2 = ws.getCell(`${dbCol}2`);
     const top3 = ws.getCell(`${dbCol}3`);
     top2.value = v2;
     top3.value = v3;
 
-    // Ausrichtung mittig
     top2.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
     top3.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 
-    // Hintergrund/Fonts der DB-Zelle übernehmen (falls vorhanden)
     const src2 = ws.getCell(`${dbCol}2`);
     const src3 = ws.getCell(`${dbCol}3`);
     if (src2.fill)  top2.fill  = src2.fill;
@@ -227,28 +215,140 @@ function mergePairHeaders(ws, pairs) {
   }
 }
 
+// -------- Quality Check Functions (Python Integration) ----------
+async function runQualityCheck(inputBuffer) {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'siemens-quality-'));
+  const inputFile = path.join(tempDir, 'input.xlsx');
+  const outputFile = path.join(tempDir, 'output.xlsx');
+  const pythonScript = path.join(__dirname, 'Bewertung_Ende.py');
+
+  try {
+    // Write input file
+    await fs.writeFile(inputFile, inputBuffer);
+    
+    // Modify Python script content to use our temp files
+    const pythonCode = await fs.readFile(pythonScript, 'utf8');
+    const modifiedPython = pythonCode
+      .replace(/input_path = .*/, `input_path = "${inputFile.replace(/\\/g, '/')}"`)
+      .replace(/output_path = .*/, `output_path = "${outputFile.replace(/\\/g, '/')}"`);
+    
+    const tempPythonScript = path.join(tempDir, 'quality_check.py');
+    await fs.writeFile(tempPythonScript, modifiedPython);
+
+    // Run Python script
+    return new Promise((resolve, reject) => {
+      const python = spawn('python', [tempPythonScript], {
+        cwd: tempDir,
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      python.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      python.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      python.on('close', async (code) => {
+        try {
+          if (code !== 0) {
+            reject(new Error(`Python script failed with code ${code}: ${stderr}`));
+            return;
+          }
+
+          // Read results
+          const qualityBuffer = await fs.readFile(outputFile);
+          
+          // Create release list (only rows without errors)
+          const wb = new ExcelJS.Workbook();
+          await wb.xlsx.load(qualityBuffer);
+          
+          const releaseWb = new ExcelJS.Workbook();
+          const releaseWs = releaseWb.addWorksheet('Freigabeliste');
+          
+          // Copy data from "Ohne_Fehler" sheet if it exists
+          const ohneFehlersWs = wb.getWorksheet('Ohne_Fehler');
+          if (ohneFehlersWs) {
+            ohneFehlersWs.eachRow((row, rowNumber) => {
+              const newRow = releaseWs.addRow(row.values);
+              // Copy formatting
+              row.eachCell((cell, colNumber) => {
+                const newCell = newRow.getCell(colNumber);
+                if (cell.fill) newCell.fill = cell.fill;
+                if (cell.font) newCell.font = cell.font;
+                if (cell.border) newCell.border = cell.border;
+                if (cell.alignment) newCell.alignment = cell.alignment;
+              });
+            });
+          }
+          
+          const releaseBuffer = await releaseWb.xlsx.writeBuffer();
+
+          // Calculate stats
+          const totalRows = wb.getWorksheet('Ohne_Fehler')?.rowCount || 0;
+          const validRows = ohneFehlersWs?.rowCount || 0;
+
+          // Cleanup
+          await fs.rm(tempDir, { recursive: true, force: true });
+
+          resolve({
+            qualityReport: Array.from(qualityBuffer),
+            releaseList: Array.from(releaseBuffer),
+            stats: {
+              total: totalRows,
+              valid: validRows,
+              invalid: totalRows - validRows
+            }
+          });
+
+        } catch (error) {
+          await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+          reject(error);
+        }
+      });
+
+      python.on('error', async (error) => {
+        await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+        reject(error);
+      });
+    });
+
+  } catch (error) {
+    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    throw error;
+  }
+}
+
 // -------- Routes ----------
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
-app.post('/api/process-excel', upload.single('file'), async (req, res) => {
+// Web Search Route
+app.post('/api/web-search', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Bitte Excel-Datei hochladen (file).' });
 
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(req.file.buffer);
 
-    // 1) A2V-Nummern aus Spalte Z (ursprünglich) einsammeln, bevor wir umbauen
+    // 1) A2V-Nummern sammeln
     const tasks = [];
-    const rowsPerSheet = new Map(); // ws -> [rowIndex,...]
+    const rowsPerSheet = new Map();
     for (const ws of wb.worksheets) {
       const indices = [];
       const last = ws.lastRow?.number || 0;
-      for (let r = FIRST_DATA_ROW - 1; r <= last; r++) { // -1, weil wir gleich eine Zeile 4 einfügen
+      for (let r = FIRST_DATA_ROW - 1; r <= last; r++) {
         const a2v = (ws.getCell(`${ORIGINAL_COLS.Z}${r}`).value || '').toString().trim().toUpperCase();
-        if (a2v.startsWith('A2V')) { indices.push(r); tasks.push(a2v); }
+        if (a2v.startsWith('A2V')) { 
+          indices.push(r); 
+          tasks.push(a2v); 
+        }
       }
       rowsPerSheet.set(ws, indices);
     }
@@ -256,59 +356,57 @@ app.post('/api/process-excel', upload.single('file'), async (req, res) => {
     // 2) Scrapen
     const resultsMap = await scraper.scrapeMany(tasks, SCRAPE_CONCURRENCY);
 
-    // 3) Umbau pro Worksheet
+    // 3) Statistics
+    let foundCount = 0;
+    let missingCount = 0;
+    let diffCount = 0;
+
+    // 4) Umbau pro Worksheet
     for (const ws of wb.worksheets) {
-      // 3.1 Spaltenstruktur berechnen
       const structure = calculateNewColumnStructure(ws);
 
-      // 3.2 Spalten einfügen (von rechts nach links)
+      // Spalten einfügen
       for (const pair of [...structure.pairs].reverse()) {
-        const insertPos = getColumnIndex(pair.original) + 1; // rechts neben der Originalspalte
+        const insertPos = getColumnIndex(pair.original) + 1;
         ws.spliceColumns(insertPos, 0, [null]);
       }
 
-      // 3.3 Zeile 4 (Labels) einfügen
+      // Zeile 4 (Labels) einfügen
       ws.spliceRows(LABEL_ROW, 0, [null]);
 
-      // 3.4 Zeilen 2 & 3 Inhalte in Web-Spalten spiegeln + Labels schreiben
+      // Zeilen 2 & 3 Inhalte spiegeln + Labels
       for (const pair of structure.pairs) {
-        // Inhalte 2/3 spiegeln
         const dbTech = ws.getCell(`${pair.dbCol}2`).value;
         const dbName = ws.getCell(`${pair.dbCol}3`).value;
         ws.getCell(`${pair.webCol}2`).value = dbTech;
         ws.getCell(`${pair.webCol}3`).value = dbName;
         copyColumnFormatting(ws, pair.dbCol, pair.webCol, 1, 3);
 
-        // Labels Zeile 4
         ws.getCell(`${pair.dbCol}${LABEL_ROW}`).value  = 'DB-Wert';
         ws.getCell(`${pair.webCol}${LABEL_ROW}`).value = 'Web-Wert';
         applyLabelCellFormatting(ws, `${pair.dbCol}${LABEL_ROW}`, false);
         applyLabelCellFormatting(ws, `${pair.webCol}${LABEL_ROW}`, true);
       }
 
-      // 3.5 Top-Header (Zeile 1) setzen
       applyTopHeader(ws);
-
-      // 3.6 NEU: Header in Zeile 2 und 3 pro Paar zusammenfassen (C2:D2, C3:D3, F2:G2, F3:G3, ...)
       mergePairHeaders(ws, structure.pairs);
 
-      // 3.7 Web-Daten eintragen / vergleichen
+      // Web-Daten eintragen
       const prodRows = rowsPerSheet.get(ws) || [];
       for (const originalRow of prodRows) {
-        const currentRow = originalRow + 1; // wegen eingefügter Label-Zeile
+        const currentRow = originalRow + 1;
 
-        // neue Z-Spalte (A2V) bestimmen
         let zCol = ORIGINAL_COLS.Z;
         if (structure.otherCols.has(ORIGINAL_COLS.Z)) zCol = structure.otherCols.get(ORIGINAL_COLS.Z);
         const a2v = (ws.getCell(`${zCol}${currentRow}`).value || '').toString().trim().toUpperCase();
         const web = resultsMap.get(a2v) || {};
 
-        // je Paar
         for (const pair of structure.pairs) {
           const dbValue = ws.getCell(`${pair.dbCol}${currentRow}`).value;
           let webValue = null;
           let isEqual = false;
 
+          // Web-Wert extrahieren basierend auf Spalte
           switch (pair.original) {
             case 'C': // Material-Kurztext
               webValue = (web.Produkttitel && web.Produkttitel !== 'Nicht gefunden') ? web.Produkttitel : null;
@@ -359,10 +457,22 @@ app.post('/api/process-excel', upload.single('file'), async (req, res) => {
           const hasDb = hasValue(dbValue);
           const hasWeb = webValue !== null;
 
+          // Statistiken aktualisieren
           if (hasWeb) {
+            foundCount++;
+            if (hasDb) {
+              if (isEqual) {
+                fillColor(ws, `${pair.webCol}${currentRow}`, 'green');
+              } else {
+                fillColor(ws, `${pair.webCol}${currentRow}`, 'red');
+                diffCount++;
+              }
+            } else {
+              fillColor(ws, `${pair.webCol}${currentRow}`, 'orange');
+            }
             ws.getCell(`${pair.webCol}${currentRow}`).value = webValue;
-            fillColor(ws, `${pair.webCol}${currentRow}`, hasDb ? (isEqual ? 'green' : 'red') : 'orange');
           } else {
+            missingCount++;
             if (hasDb) fillColor(ws, `${pair.webCol}${currentRow}`, 'orange');
           }
         }
@@ -370,14 +480,47 @@ app.post('/api/process-excel', upload.single('file'), async (req, res) => {
     }
 
     const out = await wb.xlsx.writeBuffer();
-    res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition','attachment; filename="DB_Produktvergleich_verarbeitet.xlsx"');
-    res.send(Buffer.from(out));
+    
+    res.json({
+      fileBuffer: Array.from(out),
+      stats: {
+        found: foundCount,
+        missing: missingCount,
+        differences: diffCount
+      }
+    });
 
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
+});
+
+// Quality Check Route
+app.post('/api/quality-check', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Bitte Excel-Datei hochladen (file).' });
+
+    const result = await runQualityCheck(req.file.buffer);
+    res.json(result);
+
+  } catch (err) {
+    console.error('Quality check error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received, closing scraper...');
+  await scraper.close();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT received, closing scraper...');
+  await scraper.close();
+  process.exit(0);
 });
 
 app.listen(PORT, () => console.log(`Server running at http://0.0.0.0:${PORT}`));
