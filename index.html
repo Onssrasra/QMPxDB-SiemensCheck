@@ -3,14 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Siemens Produktdaten – Vergleich</title>
+  <title>Siemens Produktdaten — Pipeline</title>
 
-  <!-- XLSX‑Lib, falls du die bereits lokal bundelst, kannst du diesen CDN‑Import entfernen -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <style>
     :root {
-      /* DB‑Corporate‑Farben */
       --db-red: #c20015;
       --db-red-dark: #a00012;
       --grey-1: #f5f5f5;
@@ -20,6 +18,9 @@
       --text: #222;
       --white: #ffffff;
       --black: #000000;
+      --green: #22c55e;
+      --orange: #f97316;
+      --blue: #3b82f6;
     }
     * { box-sizing: border-box; }
     body {
@@ -31,7 +32,7 @@
       padding: 20px 0;
     }
     .wrap {
-      max-width: 800px;
+      max-width: 1000px;
       margin: 0 auto;
       padding: 0 20px;
     }
@@ -43,6 +44,7 @@
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
       padding: 40px;
       border: 1px solid var(--grey-2);
+      margin-bottom: 24px;
     }
     
     .header {
@@ -56,6 +58,12 @@
       font-size: 32px;
       letter-spacing: -0.5px;
       color: var(--db-red);
+      margin-bottom: 12px;
+    }
+
+    .header .subtitle {
+      font-size: 18px;
+      color: var(--grey-4);
       margin-bottom: 20px;
     }
     
@@ -67,7 +75,67 @@
       margin: 0 auto;
     }
 
-    /* ======= DROPZONE ======= */
+    /* Pipeline Steps */
+    .pipeline-steps {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 32px;
+      position: relative;
+    }
+
+    .pipeline-steps::before {
+      content: '';
+      position: absolute;
+      top: 20px;
+      left: 10%;
+      right: 10%;
+      height: 2px;
+      background: var(--grey-3);
+      z-index: 1;
+    }
+
+    .step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      flex: 1;
+      position: relative;
+      z-index: 2;
+    }
+
+    .step-number {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--grey-3);
+      color: var(--white);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .step.active .step-number {
+      background: var(--db-red);
+    }
+
+    .step.completed .step-number {
+      background: var(--green);
+    }
+
+    .step-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .step-desc {
+      font-size: 12px;
+      color: var(--grey-4);
+    }
+
+    /* Dropzone */
     .dropzone {
       border: 3px dashed var(--grey-3);
       border-radius: 16px;
@@ -84,21 +152,6 @@
       position: relative;
       overflow: hidden;
       margin-bottom: 32px;
-    }
-    
-    .dropzone::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(194, 0, 21, 0.1), transparent);
-      transition: left 0.5s ease;
-    }
-    
-    .dropzone:hover::before {
-      left: 100%;
     }
     
     .dropzone.dragover {
@@ -124,22 +177,36 @@
       font-size: 48px;
       color: var(--grey-4);
       margin-bottom: 8px;
-      transition: all 0.3s ease;
-    }
-    
-    .dropzone.dragover .dropzone-icon {
-      color: var(--db-red);
-      transform: scale(1.1);
     }
 
-    /* ======= BUTTONS ======= */
-    .actions {
+    /* Action Sections */
+    .action-section {
+      margin-bottom: 32px;
+    }
+
+    .action-section h3 {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .action-section.disabled {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    .action-buttons {
       display: flex;
       gap: 16px;
-      justify-content: center;
+      align-items: center;
       flex-wrap: wrap;
     }
-    
+
+    /* Buttons */
     button {
       min-width: 180px;
       padding: 16px 24px;
@@ -155,22 +222,7 @@
       overflow: hidden;
     }
     
-    button::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-      transition: left 0.5s ease;
-    }
-    
-    button:hover::before {
-      left: 100%;
-    }
-    
-    button:hover {
+    button:hover:not(:disabled) {
       background: var(--db-red-dark);
       transform: translateY(-2px);
       box-shadow: 0 8px 24px rgba(194, 0, 21, 0.3);
@@ -181,9 +233,20 @@
       color: var(--db-red);
     }
     
-    button.secondary:hover {
+    button.secondary:hover:not(:disabled) {
       background: var(--grey-1);
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    }
+
+    button.success {
+      background: var(--green);
+      border-color: var(--green);
+      color: var(--white);
+    }
+
+    button.success:hover:not(:disabled) {
+      background: #16a34a;
+      border-color: #16a34a;
     }
     
     button:disabled {
@@ -192,12 +255,45 @@
       transform: none;
       box-shadow: none;
     }
-    
-    button:disabled::before {
-      display: none;
+
+    /* Stats Cards */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
     }
 
-    /* ======= STATUS & PROGRESS ======= */
+    .stat-card {
+      background: var(--white);
+      border: 2px solid var(--grey-2);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+
+    .stat-card.green { border-color: var(--green); }
+    .stat-card.red { border-color: var(--db-red); }
+    .stat-card.orange { border-color: var(--orange); }
+
+    .stat-number {
+      font-size: 32px;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .stat-card.green .stat-number { color: var(--green); }
+    .stat-card.red .stat-number { color: var(--db-red); }
+    .stat-card.orange .stat-number { color: var(--orange); }
+
+    .stat-label {
+      font-size: 14px;
+      color: var(--grey-4);
+      font-weight: 500;
+    }
+
+    /* Status & Progress */
     .status {
       margin-top: 24px;
       min-height: 24px;
@@ -224,56 +320,21 @@
       transition: width 0.3s ease;
       border-radius: 999px;
     }
-    
-    /* Upload Progress */
-    .upload-progress {
-      width: 100%;
-      height: 8px;
-      background: var(--grey-2);
-      border-radius: 999px;
-      overflow: hidden;
-      margin-top: 16px;
+
+    .hidden {
       display: none;
     }
     
-    .upload-progress > div {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, var(--db-red), var(--db-red-dark));
-      transition: width 0.3s ease;
-      border-radius: 999px;
-    }
-    
-    /* Responsive Design */
+    /* Responsive */
     @media (max-width: 768px) {
-      .wrap {
-        padding: 0 16px;
-      }
-      
-      .card {
-        padding: 24px;
-      }
-      
-      .header h1 {
-        font-size: 24px;
-      }
-      
-      .dropzone {
-        padding: 40px 24px;
-      }
-      
-      .dropzone strong {
-        font-size: 18px;
-      }
-      
-      .actions {
-        flex-direction: column;
-        align-items: center;
-      }
-      
-      button {
-        min-width: 200px;
-      }
+      .wrap { padding: 0 16px; }
+      .card { padding: 24px; }
+      .header h1 { font-size: 24px; }
+      .dropzone { padding: 40px 24px; }
+      .action-buttons { flex-direction: column; align-items: stretch; }
+      button { min-width: auto; }
+      .pipeline-steps { flex-direction: column; gap: 16px; }
+      .pipeline-steps::before { display: none; }
     }
   </style>
 </head>
@@ -283,57 +344,167 @@
     <div class="card">
       <!-- Header -->
       <div class="header">
-        <h1>Siemens Produktdatenvergleich</h1>
+        <h1>Siemens Produktdaten Pipeline</h1>
+        <div class="subtitle">Web-First Vergleich & Qualitätsprüfung</div>
         <div class="divider"></div>
       </div>
 
-      <!-- Drop‑Zone -->
-      <div id="dropzone" class="dropzone">
-        <div class="dropzone-icon">📁</div>
-        <p id="dzText">
-          <strong>Datei hier ablegen</strong><br>
-          oder klicken zum Auswählen
-        </p>
-        <p class="hint">Unterstützt .xlsx und .xls Dateien (max. 50 MB)</p>
+      <!-- Pipeline Steps -->
+      <div class="pipeline-steps">
+        <div class="step active" id="step-1">
+          <div class="step-number">1</div>
+          <div class="step-title">Upload</div>
+          <div class="step-desc">Drag & Drop Excel</div>
+        </div>
+        <div class="step" id="step-2">
+          <div class="step-number">2</div>
+          <div class="step-title">Web-Suche</div>
+          <div class="step-desc">A2V Scraping</div>
+        </div>
+        <div class="step" id="step-3">
+          <div class="step-number">3</div>
+          <div class="step-title">Qualitätsprüfung</div>
+          <div class="step-desc">Vollständigkeit & Validierung</div>
+        </div>
       </div>
-      <input type="file" id="fileInput" accept=".xlsx,.xls" hidden />
 
-      <!-- Aktionen -->
-      <div class="actions">
-        <button id="processBtn" disabled>Verarbeiten</button>
-        <button id="downloadBtn" class="secondary" disabled>Herunterladen</button>
+      <!-- Step 1: Upload -->
+      <div class="action-section" id="upload-section">
+        <h3>📁 Schritt 1: Datei Upload</h3>
+        <div id="dropzone" class="dropzone">
+          <div class="dropzone-icon">📄</div>
+          <p id="dzText">
+            <strong>Datei hier ablegen</strong><br>
+            oder klicken zum Auswählen
+          </p>
+          <p class="hint">Unterstützt .xlsx und .xls Dateien (max. 50 MB)</p>
+        </div>
+        <input type="file" id="fileInput" accept=".xlsx,.xls" hidden />
+      </div>
+
+      <!-- Step 2: Web Search -->
+      <div class="action-section disabled" id="web-search-section">
+        <h3>🔍 Schritt 2: Web-Suche starten</h3>
+        <p>Scrape alle A2V → schreibe nur in die Web-Nachbarspalten</p>
+        <div class="action-buttons">
+          <button id="webSearchBtn" disabled>Web-Suche starten</button>
+          <button id="downloadWebBtn" class="secondary" disabled>Web-Ergebnis herunterladen</button>
+        </div>
+        
+        <!-- Web Search Stats -->
+        <div id="webStats" class="stats-grid hidden">
+          <div class="stat-card green">
+            <div class="stat-number" id="foundCount">0</div>
+            <div class="stat-label">Gefundene Web-Werte</div>
+          </div>
+          <div class="stat-card orange">
+            <div class="stat-number" id="missingCount">0</div>
+            <div class="stat-label">Fehlende Web-Werte</div>
+          </div>
+          <div class="stat-card red">
+            <div class="stat-number" id="diffCount">0</div>
+            <div class="stat-label">Abweichungen</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Quality Check -->
+      <div class="action-section disabled" id="quality-section">
+        <h3>✅ Schritt 3: Vollständigkeit & Richtigkeit prüfen</h3>
+        <p>Prüfung nur auf Original-Tabelle (ohne Web-Daten)</p>
+        <div class="action-buttons">
+          <button id="qualityCheckBtn" disabled>Vollständigkeit prüfen</button>
+          <button id="downloadQualityBtn" class="secondary" disabled>Qualitätsbericht.xlsx</button>
+          <button id="downloadReleaseBtn" class="success" disabled>Freigabeliste.xlsx</button>
+        </div>
       </div>
 
       <div class="status" id="status"></div>
-      <div class="upload-progress" id="uploadProgress"><div></div></div>
       <div class="progress" id="progress"><div></div></div>
     </div>
   </div>
 
   <script>
     /* ==================== VARIABLEN ==================== */
-    const dropzone   = document.getElementById('dropzone');
-    const dzText     = document.getElementById('dzText');
-    const fileInput  = document.getElementById('fileInput');
-    const processBtn = document.getElementById('processBtn');
-    const downloadBtn= document.getElementById('downloadBtn');
-    const statusEl   = document.getElementById('status');
+    const dropzone = document.getElementById('dropzone');
+    const dzText = document.getElementById('dzText');
+    const fileInput = document.getElementById('fileInput');
+    
+    // Buttons
+    const webSearchBtn = document.getElementById('webSearchBtn');
+    const downloadWebBtn = document.getElementById('downloadWebBtn');
+    const qualityCheckBtn = document.getElementById('qualityCheckBtn');
+    const downloadQualityBtn = document.getElementById('downloadQualityBtn');
+    const downloadReleaseBtn = document.getElementById('downloadReleaseBtn');
+    
+    // UI Elements
+    const statusEl = document.getElementById('status');
     const progressEl = document.getElementById('progress');
-    const bar        = progressEl.firstElementChild;
-    const uploadProgressEl = document.getElementById('uploadProgress');
-    const uploadBar = uploadProgressEl.firstElementChild;
+    const bar = progressEl.firstElementChild;
+    
+    // Sections
+    const uploadSection = document.getElementById('upload-section');
+    const webSearchSection = document.getElementById('web-search-section');
+    const qualitySection = document.getElementById('quality-section');
+    
+    // Stats
+    const webStats = document.getElementById('webStats');
+    const foundCount = document.getElementById('foundCount');
+    const missingCount = document.getElementById('missingCount');
+    const diffCount = document.getElementById('diffCount');
+    
+    // Steps
+    const step1 = document.getElementById('step-1');
+    const step2 = document.getElementById('step-2');
+    const step3 = document.getElementById('step-3');
 
-    let selectedFile = null,
-        processedBlob = null;
+    let selectedFile = null;
+    let webProcessedBlob = null;
+    let qualityBlob = null;
+    let releaseBlob = null;
 
-    /* ==================== DROP‑ZONE ==================== */
+    /* ==================== HELPER FUNCTIONS ==================== */
+    function updateStep(stepNum, status) {
+      const steps = [step1, step2, step3];
+      steps.forEach((step, i) => {
+        step.classList.remove('active', 'completed');
+        if (i + 1 < stepNum || (i + 1 === stepNum && status === 'completed')) {
+          step.classList.add('completed');
+        } else if (i + 1 === stepNum && status === 'active') {
+          step.classList.add('active');
+        }
+      });
+    }
+
+    function enableSection(section, enable = true) {
+      if (enable) {
+        section.classList.remove('disabled');
+      } else {
+        section.classList.add('disabled');
+      }
+    }
+
+    function showProgress(show = true) {
+      progressEl.style.display = show ? 'block' : 'none';
+      if (!show) bar.style.width = '0%';
+    }
+
+    function updateProgress(percent) {
+      bar.style.width = percent + '%';
+    }
+
+    /* ==================== DROP ZONE ==================== */
     dropzone.addEventListener('click', () => fileInput.click());
 
     dropzone.addEventListener('dragover', e => {
       e.preventDefault();
       dropzone.classList.add('dragover');
     });
-    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.classList.remove('dragover');
+    });
+
     dropzone.addEventListener('drop', e => {
       e.preventDefault();
       dropzone.classList.remove('dragover');
@@ -348,84 +519,161 @@
       }
     });
 
-    function handleFile(file){
-      if(!/\.(xlsx|xls)$/i.test(file.name)){
-        statusEl.textContent='Bitte nur .xlsx oder .xls Dateien!';
+    function handleFile(file) {
+      if (!/\.(xlsx|xls)$/i.test(file.name)) {
+        statusEl.textContent = 'Bitte nur .xlsx oder .xls Dateien!';
         return;
       }
       
-      // Upload Progress starten
-      uploadProgressEl.style.display='block';
-      uploadBar.style.width='0%';
-      statusEl.textContent='Datei wird hochgeladen...';
-      
-      // Realistischer Upload-Progress basierend auf Dateigröße
-      const fileSize = file.size;
-      const maxSize = 50 * 1024 * 1024; // 50MB
-      const progressStep = Math.min(100 / (fileSize / (1024 * 1024)), 5); // Max 5% pro Schritt
-      
-      let progress = 0;
-      const uploadInterval = setInterval(() => {
-        progress += progressStep + Math.random() * 2;
-        if (progress > 95) progress = 95;
-        uploadBar.style.width = progress + '%';
-      }, 50);
-      
-      // Datei verarbeiten
       selectedFile = file;
-      dzText.innerHTML='<strong>'+file.name+'</strong><br><span class="hint">Datei bereit zur Verarbeitung</span>';
+      dzText.innerHTML = `<strong>${file.name}</strong><br><span class="hint">Datei bereit zur Verarbeitung</span>`;
       
-      // Upload abschließen
-      setTimeout(() => {
-        clearInterval(uploadInterval);
-        uploadBar.style.width='100%';
-        statusEl.textContent='Datei erfolgreich hochgeladen – „Verarbeiten" klicken.';
-        processBtn.disabled=false;
-        
-        // Progress ausblenden nach 2 Sekunden
-        setTimeout(() => {
-          uploadProgressEl.style.display='none';
-        }, 2000);
-      }, Math.max(500, fileSize / (1024 * 1024) * 100)); // Mindestens 500ms, basierend auf Dateigröße
+      // Enable next step
+      updateStep(2, 'active');
+      enableSection(webSearchSection, true);
+      webSearchBtn.disabled = false;
+      
+      statusEl.textContent = 'Datei erfolgreich hochgeladen — Web-Suche starten oder direkt zur Qualitätsprüfung.';
     }
 
-    /* ==================== VERARBEITEN ==================== */
-    processBtn.addEventListener('click', async ()=>{
-      if(!selectedFile) return;
-      processedBlob = null;
-      downloadBtn.disabled=true;
-      statusEl.textContent='Verarbeitung läuft …';
-      bar.style.width='0%';
-      progressEl.style.display='block';
+    /* ==================== WEB SEARCH ==================== */
+    webSearchBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+      
+      webProcessedBlob = null;
+      downloadWebBtn.disabled = true;
+      webStats.classList.add('hidden');
+      
+      statusEl.textContent = 'Web-Suche läuft — A2V Nummern werden gescraped...';
+      showProgress(true);
+      updateProgress(10);
 
-      try{
-        const form=new FormData();
+      try {
+        const form = new FormData();
         form.append('file', selectedFile);
-        const resp=await fetch('/api/process-excel', { method:'POST', body:form });
-        if(!resp.ok) throw new Error('HTTP '+resp.status);
-
-        processedBlob = new Blob([await resp.arrayBuffer()], {
-          type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        
+        const resp = await fetch('/api/web-search', { 
+          method: 'POST', 
+          body: form 
         });
-        bar.style.width='100%';
-        statusEl.textContent='Fertig – jetzt herunterladen.';
-        downloadBtn.disabled=false;
-      }catch(err){
-        statusEl.textContent='Fehler: '+err.message;
-      }finally{
-        setTimeout(()=>progressEl.style.display='none', 1200);
+        
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+
+        updateProgress(50);
+        
+        const result = await resp.json();
+        webProcessedBlob = new Blob([new Uint8Array(result.fileBuffer)], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        });
+        
+        // Update stats
+        foundCount.textContent = result.stats.found || 0;
+        missingCount.textContent = result.stats.missing || 0;
+        diffCount.textContent = result.stats.differences || 0;
+        webStats.classList.remove('hidden');
+        
+        updateProgress(100);
+        statusEl.textContent = 'Web-Suche abgeschlossen — Ergebnis herunterladen oder zur Qualitätsprüfung.';
+        
+        downloadWebBtn.disabled = false;
+        updateStep(2, 'completed');
+        updateStep(3, 'active');
+        enableSection(qualitySection, true);
+        qualityCheckBtn.disabled = false;
+        
+      } catch (err) {
+        statusEl.textContent = 'Fehler bei Web-Suche: ' + err.message;
+        console.error(err);
+      } finally {
+        setTimeout(() => showProgress(false), 1200);
       }
     });
 
-    /* ==================== DOWNLOAD ==================== */
-    downloadBtn.addEventListener('click', () => {
-      if(!processedBlob) return;
-      const a=document.createElement('a');
-      a.href=URL.createObjectURL(processedBlob);
-      a.download='DB_Produktvergleich_verarbeitet.xlsx';
-      a.style.display='none';
-      document.body.append(a); a.click();
-      URL.revokeObjectURL(a.href); a.remove();
+    /* ==================== QUALITY CHECK ==================== */
+    qualityCheckBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+      
+      qualityBlob = null;
+      releaseBlob = null;
+      downloadQualityBtn.disabled = true;
+      downloadReleaseBtn.disabled = true;
+      
+      statusEl.textContent = 'Qualitätsprüfung läuft — Vollständigkeit und Richtigkeit werden geprüft...';
+      showProgress(true);
+      updateProgress(20);
+
+      try {
+        const form = new FormData();
+        form.append('file', selectedFile);
+        
+        const resp = await fetch('/api/quality-check', { 
+          method: 'POST', 
+          body: form 
+        });
+        
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+
+        updateProgress(70);
+        
+        const result = await resp.json();
+        
+        qualityBlob = new Blob([new Uint8Array(result.qualityReport)], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        });
+        
+        releaseBlob = new Blob([new Uint8Array(result.releaseList)], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        });
+        
+        updateProgress(100);
+        statusEl.textContent = `Qualitätsprüfung abgeschlossen — ${result.stats.total} Datensätze geprüft, ${result.stats.valid} fehlerfrei.`;
+        
+        downloadQualityBtn.disabled = false;
+        downloadReleaseBtn.disabled = false;
+        updateStep(3, 'completed');
+        
+      } catch (err) {
+        statusEl.textContent = 'Fehler bei Qualitätsprüfung: ' + err.message;
+        console.error(err);
+      } finally {
+        setTimeout(() => showProgress(false), 1200);
+      }
+    });
+
+    /* ==================== DOWNLOADS ==================== */
+    downloadWebBtn.addEventListener('click', () => {
+      if (!webProcessedBlob) return;
+      downloadBlob(webProcessedBlob, 'Web_Vergleich_Ergebnis.xlsx');
+    });
+
+    downloadQualityBtn.addEventListener('click', () => {
+      if (!qualityBlob) return;
+      downloadBlob(qualityBlob, 'Qualitätsbericht.xlsx');
+    });
+
+    downloadReleaseBtn.addEventListener('click', () => {
+      if (!releaseBlob) return;
+      downloadBlob(releaseBlob, 'Freigabeliste.xlsx');
+    });
+
+    function downloadBlob(blob, filename) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.style.display = 'none';
+      document.body.append(a);
+      a.click();
+      URL.revokeObjectURL(a.href);
+      a.remove();
+    }
+
+    // Enable quality check even without web search (for direct quality check)
+    // This allows users to skip web search and go directly to quality check
+    fileInput.addEventListener('change', () => {
+      if (selectedFile) {
+        enableSection(qualitySection, true);
+        qualityCheckBtn.disabled = false;
+      }
     });
   </script>
 </body>
