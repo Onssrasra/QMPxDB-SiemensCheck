@@ -1,21 +1,15 @@
 {
-  "name": "db-produktvergleich-tool",
-  "version": "2.0.1",
+  "name": "clickbot-completeness-app",
+  "version": "1.0.0",
   "private": true,
-  "engines": {
-    "node": ">=18"
-  },
+  "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "install-browsers": "npx playwright install --with-deps chromium"
+    "dev": "node server.js"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "cors": "^2.8.5",
-    "helmet": "^7.0.0",
-    "multer": "^1.4.5-lts.1",
     "exceljs": "^4.4.0",
-    "cheerio": "^1.0.0-rc.12",
-    "playwright": "^1.45.1"
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1"
   }
 }
