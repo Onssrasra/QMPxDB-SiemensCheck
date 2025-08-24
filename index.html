@@ -29,7 +29,7 @@
       background: linear-gradient(135deg, var(--grey-1) 0%, var(--grey-2) 100%);
       color: var(--text);
       min-height: 100vh;
-      padding: 20px 0;
+      padding: 10px 0;
     }
     .wrap {
       max-width: 1000px;
@@ -42,34 +42,34 @@
       background: var(--white);
       border-radius: 16px;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-      padding: 40px;
+      padding: 30px;
       border: 1px solid var(--grey-2);
-      margin-bottom: 24px;
+      margin-bottom: 20px;
     }
     
     .header {
       text-align: center;
-      margin-bottom: 40px;
+      margin-bottom: 30px;
     }
     
     .header h1 {
       margin: 0;
       font-weight: 700;
-      font-size: 32px;
+      font-size: 28px;
       letter-spacing: -0.5px;
       color: var(--db-red);
-      margin-bottom: 12px;
+      margin-bottom: 8px;
     }
 
     .header .subtitle {
-      font-size: 18px;
+      font-size: 16px;
       color: var(--grey-4);
-      margin-bottom: 20px;
+      margin-bottom: 15px;
     }
     
     .divider {
       width: 100%;
-      height: 4px;
+      height: 3px;
       background: var(--db-red);
       border-radius: 2px;
       margin: 0 auto;
@@ -79,14 +79,14 @@
     .pipeline-steps {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 32px;
+      margin-bottom: 25px;
       position: relative;
     }
 
     .pipeline-steps::before {
       content: '';
       position: absolute;
-      top: 20px;
+      top: 16px;
       left: 10%;
       right: 10%;
       height: 2px;
@@ -105,8 +105,8 @@
     }
 
     .step-number {
-      width: 40px;
-      height: 40px;
+      width: 32px;
+      height: 32px;
       border-radius: 50%;
       background: var(--grey-3);
       color: var(--white);
@@ -114,7 +114,8 @@
       align-items: center;
       justify-content: center;
       font-weight: bold;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
+      font-size: 14px;
     }
 
     .step.active .step-number {
@@ -127,19 +128,20 @@
 
     .step-title {
       font-weight: 600;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
+      font-size: 13px;
     }
 
     .step-desc {
-      font-size: 12px;
+      font-size: 10px;
       color: var(--grey-4);
     }
 
-    /* Dropzone */
+    /* Dropzone - kompakter */
     .dropzone {
       border: 2px dashed var(--grey-3);
-      border-radius: 12px;
-      padding: 30px 20px;
+      border-radius: 10px;
+      padding: 20px 15px;
       background: var(--grey-1);
       cursor: pointer;
       transition: all 0.3s ease;
@@ -147,11 +149,12 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: 6px;
       user-select: none;
       position: relative;
       overflow: hidden;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
+      min-height: 100px;
     }
     
     .dropzone.dragover {
@@ -162,36 +165,36 @@
     }
     
     .dropzone strong {
-      font-size: 16px;
+      font-size: 14px;
       font-weight: 600;
       color: var(--text);
     }
     
     .hint {
-      font-size: 14px;
+      font-size: 12px;
       color: var(--grey-4);
-      margin-top: 8px;
+      margin-top: 4px;
     }
     
     .dropzone-icon {
-      font-size: 32px;
+      font-size: 24px;
       color: var(--grey-4);
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
 
     /* Action Sections */
     .action-section {
-      margin-bottom: 32px;
+      margin-bottom: 25px;
     }
 
     .action-section h3 {
-      font-size: 20px;
+      font-size: 18px;
       font-weight: 600;
       color: var(--text);
-      margin-bottom: 16px;
+      margin-bottom: 12px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
 
     .action-section.disabled {
@@ -201,18 +204,18 @@
 
     .action-buttons {
       display: flex;
-      gap: 16px;
+      gap: 12px;
       align-items: center;
       flex-wrap: wrap;
     }
 
     /* Buttons */
     button {
-      min-width: 180px;
-      padding: 16px 24px;
-      font-size: 16px;
+      min-width: 160px;
+      padding: 12px 20px;
+      font-size: 14px;
       font-weight: 600;
-      border-radius: 12px;
+      border-radius: 10px;
       border: 2px solid var(--db-red);
       background: var(--db-red);
       color: var(--white);
@@ -259,16 +262,16 @@
     /* Stats Cards */
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
-      margin: 20px 0;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin: 15px 0;
     }
 
     .stat-card {
       background: var(--white);
       border: 2px solid var(--grey-2);
-      border-radius: 12px;
-      padding: 20px;
+      border-radius: 10px;
+      padding: 15px;
       text-align: center;
       transition: all 0.3s ease;
     }
@@ -278,9 +281,9 @@
     .stat-card.orange { border-color: var(--orange); }
 
     .stat-number {
-      font-size: 32px;
+      font-size: 28px;
       font-weight: bold;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     .stat-card.green .stat-number { color: var(--green); }
@@ -288,16 +291,16 @@
     .stat-card.orange .stat-number { color: var(--orange); }
 
     .stat-label {
-      font-size: 14px;
+      font-size: 12px;
       color: var(--grey-4);
       font-weight: 500;
     }
 
     /* Status & Progress */
     .status {
-      margin-top: 24px;
-      min-height: 24px;
-      font-size: 16px;
+      margin-top: 20px;
+      min-height: 20px;
+      font-size: 14px;
       color: var(--text);
       text-align: center;
       font-weight: 500;
@@ -305,11 +308,11 @@
     
     .progress {
       width: 100%;
-      height: 8px;
+      height: 6px;
       background: var(--grey-2);
       border-radius: 999px;
       overflow: hidden;
-      margin-top: 16px;
+      margin-top: 12px;
       display: none;
     }
     
@@ -327,14 +330,22 @@
     
     /* Responsive */
     @media (max-width: 768px) {
-      .wrap { padding: 0 16px; }
-      .card { padding: 24px; }
+      .wrap { padding: 0 15px; }
+      .card { padding: 20px; }
       .header h1 { font-size: 24px; }
-      .dropzone { padding: 40px 24px; }
+      .dropzone { padding: 15px; min-height: 80px; }
       .action-buttons { flex-direction: column; align-items: stretch; }
       button { min-width: auto; }
-      .pipeline-steps { flex-direction: column; gap: 16px; }
+      .pipeline-steps { flex-direction: column; gap: 12px; }
       .pipeline-steps::before { display: none; }
+    }
+
+    @media (max-height: 700px) {
+      .card { padding: 20px; }
+      .header { margin-bottom: 20px; }
+      .pipeline-steps { margin-bottom: 20px; }
+      .action-section { margin-bottom: 20px; }
+      .dropzone { min-height: 80px; padding: 15px; }
     }
   </style>
 </head>
@@ -354,17 +365,14 @@
         <div class="step active" id="step-1">
           <div class="step-number">1</div>
           <div class="step-title">Upload</div>
-          <div class="step-desc">Drag & Drop Excel</div>
         </div>
         <div class="step" id="step-2">
           <div class="step-number">2</div>
           <div class="step-title">Web-Suche</div>
-          <div class="step-desc">A2V Scraping</div>
         </div>
         <div class="step" id="step-3">
           <div class="step-number">3</div>
           <div class="step-title">Qualitätsprüfung</div>
-          <div class="step-desc">Vollständigkeit & Validierung</div>
         </div>
       </div>
 
@@ -531,6 +539,10 @@
       enableSection(webSearchSection, true);
       webSearchBtn.disabled = false;
       
+      // Enable quality check directly (without web search)
+      enableSection(qualitySection, true);
+      qualityCheckBtn.disabled = false;
+      
       statusEl.textContent = 'Datei erfolgreich hochgeladen — Web-Suche starten oder direkt zur Qualitätsprüfung.';
     }
 
@@ -576,8 +588,6 @@
         downloadWebBtn.disabled = false;
         updateStep(2, 'completed');
         updateStep(3, 'active');
-        enableSection(qualitySection, true);
-        qualityCheckBtn.disabled = false;
         
       } catch (err) {
         statusEl.textContent = 'Fehler bei Web-Suche: ' + err.message;
@@ -609,7 +619,10 @@
           body: form 
         });
         
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        if (!resp.ok) {
+          const errorData = await resp.text();
+          throw new Error(`HTTP ${resp.status}: ${errorData}`);
+        }
 
         updateProgress(70);
         
@@ -664,15 +677,6 @@
       URL.revokeObjectURL(a.href);
       a.remove();
     }
-
-    // Enable quality check even without web search (for direct quality check)
-    // This allows users to skip web search and go directly to quality check
-    fileInput.addEventListener('change', () => {
-      if (selectedFile) {
-        enableSection(qualitySection, true);
-        qualityCheckBtn.disabled = false;
-      }
-    });
   </script>
 </body>
 </html>
