@@ -356,7 +356,7 @@
       <!-- Header -->
       <div class="header">
         <h1>Siemens Produktdaten Pipeline</h1>
-        <div class="subtitle">Web-Vergleich & Qualitätsprüfung — Zwei separate Funktionen</div>
+        <div class="subtitle">Web-Vergleich & Qualitätsprüfung — Zwei völlig unabhängige Funktionen</div>
         <div class="divider"></div>
       </div>
 
@@ -397,7 +397,8 @@
           Vergleicht DB-Werte mit Web-Daten von Siemens (A2V-Nummern):<br>
           • Grüne Zellen: DB und Web stimmen überein<br>
           • Rote Zellen: DB und Web weichen voneinander ab<br>
-          • Orange Zellen: Nur DB-Wert vorhanden oder nur Web-Wert gefunden
+          • Orange Zellen: Nur DB-Wert vorhanden oder nur Web-Wert gefunden<br>
+          <strong>Funktioniert völlig unabhängig von der Qualitätsprüfung!</strong>
         </p>
         <div class="action-buttons">
           <button id="webSearchBtn" disabled>Web-Suche starten</button>
@@ -423,12 +424,13 @@
 
       <!-- Step 3: Quality Check -->
       <div class="action-section disabled" id="quality-section">
-        <h3>✅ Schritt 3: Vollständigkeit & Richtigkeit prüfen</h3>
+        <h3>✅ Schritt 3: Vollständigkeit & Plausibilität prüfen</h3>
         <p style="font-size: 14px; color: var(--grey-4); margin-bottom: 15px; line-height: 1.4;">
-          Prüft die hochgeladene Original-Tabelle auf Vollständigkeit und Richtigkeit:<br>
-          • Fert./Prüfhinweis-Format (5 Teile, gültige Werte)<br>
-          • Pflichtfelder B-J, N, R-W (dürfen nicht leer sein)<br>
-          • Maßprüfung (Länge/Breite/Höhe oder Textmaß)
+          Prüft die hochgeladene Original-Tabelle (Header Zeile 3, Daten ab Zeile 4):<br>
+          • <strong>Fert./Prüfhinweis:</strong> 5 Teile mit gültigen Werten (OHNE/1/2/3, N/3.2/3.1/2.2/2.1, N/CL1/CL2/CL3, N/J, N/A1/A2/A3/A5/A+)<br>
+          • <strong>Pflichtfelder:</strong> Spalten B-J, N, R-W dürfen nicht leer sein<br>
+          • <strong>Maßwerte:</strong> Länge/Breite/Höhe plausibel oder Textmaß vorhanden<br>
+          • <strong>Ergebnis:</strong> Gleiche Datei mit Farbcodierung (Grün=fehlerfrei, Rot=mit Fehlern)
         </p>
         <div class="action-buttons">
           <button id="qualityCheckBtn" disabled>Vollständigkeit prüfen</button>
