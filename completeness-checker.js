@@ -50,12 +50,28 @@ function cloneWorksheetValues(src, dst){
     const w = src.getColumn(c).width;
     if (w) dst.getColumn(c).width = w;
   }
-  // Copy all rows' values 1:1
+  
+  // Copy all rows' values 1:1 - including the first row (Zeile 1)
   const last = src.lastRow ? src.lastRow.number : src.rowCount;
   for (let r=1; r<=last; r++){
     const sRow = src.getRow(r);
     const dRow = dst.getRow(r);
     dRow.values = sRow.values;
+    
+    // Preserve cell formatting for the first row especially
+    if (r === 1) {
+      for (let c=1; c<=sRow.cellCount; c++){
+        const srcCell = sRow.getCell(c);
+        const dstCell = dRow.getCell(c);
+        
+        // Copy formatting properties
+        if (srcCell.fill) dstCell.fill = srcCell.fill;
+        if (srcCell.font) dstCell.font = srcCell.font;
+        if (srcCell.border) dstCell.border = srcCell.border;
+        if (srcCell.alignment) dstCell.alignment = srcCell.alignment;
+        if (srcCell.numFmt) dstCell.numFmt = srcCell.numFmt;
+      }
+    }
   }
 }
 
@@ -82,12 +98,9 @@ async function checkCompleteness(fileBuffer) {
   const src = inWb.worksheets[0];
   if (!src) throw new Error('Keine Tabelle im Workbook gefunden.');
 
-  // Prepare output workbook with two sheets:
-  // 1) "Qualitätsbericht" (colored copy of original)
-  // 2) "Vollständigeliste" (only fully valid rows, same columns, header from row 3)
+  // Prepare output workbook with only one sheet: "Qualitätsbericht"
   const outWb = new ExcelJS.Workbook();
   const wsQ = outWb.addWorksheet('Qualitätsbericht');
-  const wsOK = outWb.addWorksheet('Vollständigeliste');
 
   // Clone original values to Qualitätsbericht to preserve structure (no subheaders/structure changes)
   cloneWorksheetValues(src, wsQ);
@@ -99,12 +112,6 @@ async function checkCompleteness(fileBuffer) {
   const cH    = colByHeader(src, 'Höhe');
   const cTxt  = colByHeader(src, 'Materialkurztext');
   const cGew  = colByHeader(src, 'Gewicht'); // optional
-
-  // Build header for "Vollständigeliste" from src row 3
-  const hdrRow = src.getRow(HEADER_ROW);
-  const headerValues = [];
-  for (let c = 1; c <= src.columnCount; c++) headerValues.push(hdrRow.getCell(c).value);
-  wsOK.addRow(headerValues);
 
   // Iterate data rows (from row 4)
   const last = src.lastRow ? src.lastRow.number : FIRST_DATA_ROW - 1;
@@ -163,14 +170,11 @@ async function checkCompleteness(fileBuffer) {
       }
     }
 
-    // 5) If row has neither red nor orange → whole row green + push to "Vollständigeliste"
+    // 5) If row has neither red nor orange → whole row green
     if (!hasRed && !hasOrange){
       for (let c = 1; c <= src.columnCount; c++){
         rowQ.getCell(c).fill = FILL_GREEN;
       }
-      const okVals = [];
-      for (let c = 1; c <= src.columnCount; c++) okVals.push(rowS.getCell(c).value);
-      wsOK.addRow(okVals);
     }
   }
 

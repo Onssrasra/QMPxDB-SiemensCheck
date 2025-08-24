@@ -421,7 +421,6 @@
         <div class="action-buttons">
           <button id="qualityCheckBtn" disabled>Vollständigkeit prüfen</button>
           <button id="downloadQualityBtn" class="secondary" disabled>Qualitätsbericht.xlsx</button>
-          <button id="downloadReleaseBtn" class="success" disabled>Freigabeliste.xlsx</button>
         </div>
       </div>
 
@@ -441,7 +440,6 @@
     const downloadWebBtn = document.getElementById('downloadWebBtn');
     const qualityCheckBtn = document.getElementById('qualityCheckBtn');
     const downloadQualityBtn = document.getElementById('downloadQualityBtn');
-    const downloadReleaseBtn = document.getElementById('downloadReleaseBtn');
     
     // UI Elements
     const statusEl = document.getElementById('status');
@@ -467,7 +465,6 @@
     let selectedFile = null;
     let webProcessedBlob = null;
     let qualityBlob = null;
-    let releaseBlob = null;
 
     /* ==================== HELPER FUNCTIONS ==================== */
     function updateStep(stepNum, status) {
@@ -602,9 +599,6 @@
       if (!selectedFile) return;
       
       qualityBlob = null;
-      releaseBlob = null;
-      downloadQualityBtn.disabled = true;
-      downloadReleaseBtn.disabled = true;
       
       statusEl.textContent = 'Qualitätsprüfung läuft — Vollständigkeit und Richtigkeit werden geprüft...';
       showProgress(true);
@@ -631,15 +625,10 @@
           type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         });
         
-        // For now, we'll use the same file for both quality report and release list
-        // In a real implementation, you might want to create separate files
-        releaseBlob = qualityBlob;
-        
         updateProgress(100);
-        statusEl.textContent = 'Qualitätsprüfung abgeschlossen — Qualitätsbericht und Freigabeliste verfügbar.';
+        statusEl.textContent = 'Qualitätsprüfung abgeschlossen — Qualitätsbericht verfügbar.';
         
         downloadQualityBtn.disabled = false;
-        downloadReleaseBtn.disabled = false;
         updateStep(3, 'completed');
         
       } catch (err) {
@@ -659,11 +648,6 @@
     downloadQualityBtn.addEventListener('click', () => {
       if (!qualityBlob) return;
       downloadBlob(qualityBlob, 'Qualitätsbericht.xlsx');
-    });
-
-    downloadReleaseBtn.addEventListener('click', () => {
-      if (!releaseBlob) return;
-      downloadBlob(releaseBlob, 'Freigabeliste.xlsx');
     });
 
     function downloadBlob(blob, filename) {

@@ -10,6 +10,10 @@
   "dependencies": {
     "exceljs": "^4.4.0",
     "express": "^4.19.2",
-    "multer": "^1.4.5-lts.1"
+    "multer": "^1.4.5-lts.1",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "puppeteer": "^21.6.1",
+    "mathjs": "^12.2.1"
   }
 }
