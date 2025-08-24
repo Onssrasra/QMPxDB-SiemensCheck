@@ -220,12 +220,33 @@ async function runQualityCheck(inputBuffer) {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'siemens-quality-'));
   const inputFile = path.join(tempDir, 'input.xlsx');
   const outputFile = path.join(tempDir, 'output.xlsx');
-  const pythonScript = path.join(__dirname, 'Bewertung_Ende.py');
+  
+  // Look for Python script in multiple possible locations
+  const possiblePaths = [
+    path.join(__dirname, 'Bewertung_Ende.py'),
+    path.join(process.cwd(), 'Bewertung_Ende.py'),
+    './Bewertung_Ende.py',
+    'Bewertung_Ende.py'
+  ];
+
+  let pythonScript = null;
+  for (const scriptPath of possiblePaths) {
+    try {
+      await fs.access(scriptPath);
+      pythonScript = path.resolve(scriptPath);
+      console.log(`Found Python script at: ${pythonScript}`);
+      break;
+    } catch (error) {
+      console.log(`Python script not found at: ${scriptPath}`);
+    }
+  }
+
+  if (!pythonScript) {
+    console.error('Python script not found in any of these locations:', possiblePaths);
+    throw new Error('Python script "Bewertung_Ende.py" nicht gefunden. Bitte stellen Sie sicher, dass die Datei im Server-Verzeichnis vorhanden ist.');
+  }
 
   try {
-    // Check if Python script exists
-    await fs.access(pythonScript);
-    
     // Write input file
     await fs.writeFile(inputFile, inputBuffer);
     
@@ -245,9 +266,39 @@ async function runQualityCheck(inputBuffer) {
     const tempPythonScript = path.join(tempDir, 'quality_check.py');
     await fs.writeFile(tempPythonScript, pythonCode);
 
+    // Try different Python executables
+    const pythonExecutables = ['python3', 'python', 'py'];
+    let pythonExe = null;
+
+    for (const exe of pythonExecutables) {
+      try {
+        const testProcess = spawn(exe, ['--version'], { stdio: 'pipe' });
+        await new Promise((resolve, reject) => {
+          testProcess.on('close', (code) => {
+            if (code === 0) {
+              pythonExe = exe;
+              resolve();
+            } else {
+              reject();
+            }
+          });
+          testProcess.on('error', reject);
+        });
+        console.log(`Using Python executable: ${exe}`);
+        break;
+      } catch (error) {
+        console.log(`${exe} not available`);
+      }
+    }
+
+    if (!pythonExe) {
+      throw new Error('Kein Python-Interpreter gefunden. Bitte installieren Sie Python 3.');
+    }
+
     // Run Python script
     return new Promise((resolve, reject) => {
-      const python = spawn('python3', [tempPythonScript], {
+      console.log(`Running Python script: ${pythonExe} ${tempPythonScript}`);
+      const python = spawn(pythonExe, [tempPythonScript], {
         cwd: tempDir,
         stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 120000 // 2 minutes timeout
@@ -273,7 +324,7 @@ async function runQualityCheck(inputBuffer) {
           console.log('Stderr:', stderr);
 
           if (code !== 0) {
-            reject(new Error(`Python script failed with code ${code}. Error: ${stderr}`));
+            reject(new Error(`Python script failed with code ${code}. Error: ${stderr || 'Unknown error'}`));
             return;
           }
 
@@ -385,11 +436,6 @@ async function runQualityCheck(inputBuffer) {
   } catch (error) {
     console.error('Quality check setup error:', error);
     await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
-    
-    if (error.code === 'ENOENT' && error.path && error.path.includes('Bewertung_Ende.py')) {
-      throw new Error('Python script "Bewertung_Ende.py" nicht gefunden. Bitte stellen Sie sicher, dass die Datei im Server-Verzeichnis vorhanden ist.');
-    }
-    
     throw error;
   }
 }
