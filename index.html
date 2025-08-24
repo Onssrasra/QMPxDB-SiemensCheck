@@ -356,7 +356,7 @@
       <!-- Header -->
       <div class="header">
         <h1>Siemens Produktdaten Pipeline</h1>
-        <div class="subtitle">Web-First Vergleich & Qualitätsprüfung</div>
+        <div class="subtitle">Web-Vergleich & Qualitätsprüfung — Zwei separate Funktionen</div>
         <div class="divider"></div>
       </div>
 
@@ -368,11 +368,11 @@
         </div>
         <div class="step" id="step-2">
           <div class="step-number">2</div>
-          <div class="step-title">Web-Suche</div>
+          <div class="step-title">Web-Suche<br><small>(optional)</small></div>
         </div>
         <div class="step" id="step-3">
           <div class="step-number">3</div>
-          <div class="step-title">Qualitätsprüfung</div>
+          <div class="step-title">Qualitätsprüfung<br><small>(unabhängig)</small></div>
         </div>
       </div>
 
@@ -392,7 +392,13 @@
 
       <!-- Step 2: Web Search -->
       <div class="action-section disabled" id="web-search-section">
-        <h3>🔍 Schritt 2: Web-Suche starten</h3>
+        <h3>🔍 Schritt 2: Web-Suche starten (optional)</h3>
+        <p style="font-size: 14px; color: var(--grey-4); margin-bottom: 15px; line-height: 1.4;">
+          Vergleicht DB-Werte mit Web-Daten von Siemens (A2V-Nummern):<br>
+          • Grüne Zellen: DB und Web stimmen überein<br>
+          • Rote Zellen: DB und Web weichen voneinander ab<br>
+          • Orange Zellen: Nur DB-Wert vorhanden oder nur Web-Wert gefunden
+        </p>
         <div class="action-buttons">
           <button id="webSearchBtn" disabled>Web-Suche starten</button>
           <button id="downloadWebBtn" class="secondary" disabled>Web-Ergebnis herunterladen</button>
@@ -418,6 +424,12 @@
       <!-- Step 3: Quality Check -->
       <div class="action-section disabled" id="quality-section">
         <h3>✅ Schritt 3: Vollständigkeit & Richtigkeit prüfen</h3>
+        <p style="font-size: 14px; color: var(--grey-4); margin-bottom: 15px; line-height: 1.4;">
+          Prüft die hochgeladene Original-Tabelle auf Vollständigkeit und Richtigkeit:<br>
+          • Fert./Prüfhinweis-Format (5 Teile, gültige Werte)<br>
+          • Pflichtfelder B-J, N, R-W (dürfen nicht leer sein)<br>
+          • Maßprüfung (Länge/Breite/Höhe oder Textmaß)
+        </p>
         <div class="action-buttons">
           <button id="qualityCheckBtn" disabled>Vollständigkeit prüfen</button>
           <button id="downloadQualityBtn" class="secondary" disabled>Qualitätsbericht.xlsx</button>
@@ -534,16 +546,15 @@
       selectedFile = file;
       dzText.innerHTML = `<strong>${file.name}</strong><br><span class="hint">Datei bereit zur Verarbeitung</span>`;
       
-      // Enable next step
+      // Enable both next steps (they work independently)
       updateStep(2, 'active');
+      updateStep(3, 'active');
       enableSection(webSearchSection, true);
-      webSearchBtn.disabled = false;
-      
-      // Enable quality check directly (without web search)
       enableSection(qualitySection, true);
+      webSearchBtn.disabled = false;
       qualityCheckBtn.disabled = false;
       
-      statusEl.textContent = 'Datei erfolgreich hochgeladen — Web-Suche starten oder direkt zur Qualitätsprüfung.';
+      statusEl.textContent = 'Datei erfolgreich hochgeladen — Web-Suche und Qualitätsprüfung sind beide verfügbar (unabhängig voneinander).';
     }
 
     /* ==================== WEB SEARCH ==================== */
@@ -583,11 +594,10 @@
         webStats.classList.remove('hidden');
         
         updateProgress(100);
-        statusEl.textContent = 'Web-Suche abgeschlossen — Ergebnis herunterladen oder zur Qualitätsprüfung.';
+        statusEl.textContent = 'Web-Suche abgeschlossen — Ergebnis herunterladen. Qualitätsprüfung bleibt unabhängig verfügbar.';
         
         downloadWebBtn.disabled = false;
         updateStep(2, 'completed');
-        updateStep(3, 'active');
         
       } catch (err) {
         statusEl.textContent = 'Fehler bei Web-Suche: ' + err.message;
@@ -637,7 +647,7 @@
         });
         
         updateProgress(100);
-        statusEl.textContent = `Qualitätsprüfung abgeschlossen — ${result.stats.total} Datensätze geprüft, ${result.stats.valid} fehlerfrei.`;
+        statusEl.textContent = `Qualitätsprüfung abgeschlossen — ${result.stats.total} Datensätze geprüft, ${result.stats.valid} fehlerfrei. Web-Suche bleibt unabhängig verfügbar.`;
         
         downloadQualityBtn.disabled = false;
         downloadReleaseBtn.disabled = false;

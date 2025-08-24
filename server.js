@@ -4,9 +4,7 @@ const helmet = require('helmet');
 const path = require('path');
 const multer = require('multer');
 const ExcelJS = require('exceljs');
-const { spawn } = require('child_process');
 const fs = require('fs').promises;
-const os = require('os');
 
 const {
   toNumber,
@@ -215,228 +213,276 @@ function mergePairHeaders(ws, pairs) {
   }
 }
 
-// -------- Quality Check Functions (Python Integration) ----------
+// -------- Quality Check Functions (JavaScript Implementation) --------
 async function runQualityCheck(inputBuffer) {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'siemens-quality-'));
-  const inputFile = path.join(tempDir, 'input.xlsx');
-  const outputFile = path.join(tempDir, 'output.xlsx');
-  
-  // Look for Python script in multiple possible locations
-  const possiblePaths = [
-    path.join(__dirname, 'Bewertung_Ende.py'),
-    path.join(process.cwd(), 'Bewertung_Ende.py'),
-    './Bewertung_Ende.py',
-    'Bewertung_Ende.py'
-  ];
-
-  let pythonScript = null;
-  for (const scriptPath of possiblePaths) {
-    try {
-      await fs.access(scriptPath);
-      pythonScript = path.resolve(scriptPath);
-      console.log(`Found Python script at: ${pythonScript}`);
-      break;
-    } catch (error) {
-      console.log(`Python script not found at: ${scriptPath}`);
-    }
-  }
-
-  if (!pythonScript) {
-    console.error('Python script not found in any of these locations:', possiblePaths);
-    throw new Error('Python script "Bewertung_Ende.py" nicht gefunden. Bitte stellen Sie sicher, dass die Datei im Server-Verzeichnis vorhanden ist.');
-  }
-
   try {
-    // Write input file
-    await fs.writeFile(inputFile, inputBuffer);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(inputBuffer);
     
-    // Read and modify Python script
-    let pythonCode = await fs.readFile(pythonScript, 'utf8');
-    
-    // Replace file paths in Python script
-    pythonCode = pythonCode.replace(
-      /input_path\s*=\s*.*$/m, 
-      `input_path = r"${inputFile}"`
-    );
-    pythonCode = pythonCode.replace(
-      /output_path\s*=\s*.*$/m, 
-      `output_path = r"${outputFile}"`
-    );
-    
-    const tempPythonScript = path.join(tempDir, 'quality_check.py');
-    await fs.writeFile(tempPythonScript, pythonCode);
+    // Get the first worksheet
+    const ws = wb.worksheets[0];
+    if (!ws) {
+      throw new Error('Kein Arbeitsblatt in der Excel-Datei gefunden');
+    }
 
-    // Try different Python executables
-    const pythonExecutables = ['python3', 'python', 'py'];
-    let pythonExe = null;
+    // Find header row (skip first 2 rows, use row 3 as header)
+    const headerRow = 3;
+    const firstDataRow = 4;
+    
+    // Get column headers
+    const headers = [];
+    const headerRowObj = ws.getRow(headerRow);
+    headerRowObj.eachCell((cell, colNumber) => {
+      headers[colNumber - 1] = cell.value;
+    });
 
-    for (const exe of pythonExecutables) {
+    // Find important columns by name
+    const colMap = {};
+    headers.forEach((header, index) => {
+      if (header) {
+        const headerStr = String(header).toLowerCase();
+        if (headerStr.includes('fert') || headerStr.includes('prüfhinweis')) {
+          colMap.fertPruefhinweis = index;
+        } else if (headerStr.includes('länge')) {
+          colMap.laenge = index;
+        } else if (headerStr.includes('breite')) {
+          colMap.breite = index;
+        } else if (headerStr.includes('höhe')) {
+          colMap.hoehe = index;
+        } else if (headerStr.includes('materialkurztext') || headerStr.includes('material-kurztext')) {
+          colMap.materialkurztext = index;
+        }
+      }
+    });
+
+    // Define valid values for Fert./Prüfhinweis
+    const pos1Values = new Set(["OHNE", "1", "2", "3"]);
+    const pos2Values = new Set(["N", "3.2", "3.1", "2.2", "2.1"]);
+    const pos3Values = new Set(["N", "CL1", "CL2", "CL3"]);
+    const pos4Values = new Set(["N", "J"]);
+    const pos5Values = new Set(["N", "A1", "A2", "A3", "A5", "A+"]);
+
+    // Quality check functions
+    function checkVollstaendig(hinweis) {
+      if (!hinweis || hinweis === '') return 1;
+      
+      const teile = String(hinweis).split("/").map(teil => teil.trim());
+      if (teile.length !== 5) return 1;
+      
+      return (pos1Values.has(teile[0]) && 
+              pos2Values.has(teile[1]) && 
+              pos3Values.has(teile[2]) && 
+              pos4Values.has(teile[3]) && 
+              pos5Values.has(teile[4])) ? 0 : 1;
+    }
+
+    function checkPflichtfelder(row) {
+      // Check columns B-J, N, R-W (indices 1-9, 13, 17-22)
+      const relevantIndices = [1, 2, 3, 4, 5, 6, 7, 8, 9, 13, 17, 18, 19, 20, 21, 22];
+      
+      for (const index of relevantIndices) {
+        if (index < headers.length) {
+          const cell = row.getCell(index + 1);
+          if (!cell.value || String(cell.value).trim() === '') {
+            return 1;
+          }
+        }
+      }
+      return 0;
+    }
+
+    function checkMasspruefung(row) {
+      let l = 0, b = 0, h = 0;
+      let txt = '';
+      
       try {
-        const testProcess = spawn(exe, ['--version'], { stdio: 'pipe' });
-        await new Promise((resolve, reject) => {
-          testProcess.on('close', (code) => {
-            if (code === 0) {
-              pythonExe = exe;
-              resolve();
-            } else {
-              reject();
+        if (colMap.laenge !== undefined) {
+          const laengeCell = row.getCell(colMap.laenge + 1);
+          l = parseFloat(laengeCell.value) || 0;
+        }
+        if (colMap.breite !== undefined) {
+          const breiteCell = row.getCell(colMap.breite + 1);
+          b = parseFloat(breiteCell.value) || 0;
+        }
+        if (colMap.hoehe !== undefined) {
+          const hoeheCell = row.getCell(colMap.hoehe + 1);
+          h = parseFloat(hoeheCell.value) || 0;
+        }
+        if (colMap.materialkurztext !== undefined) {
+          const txtCell = row.getCell(colMap.materialkurztext + 1);
+          txt = String(txtCell.value || '');
+        }
+      } catch (e) {
+        return 1;
+      }
+
+      // Check for text measurements like 12×34, 12x34, 12 X 34, 12*34, 12/34
+      const pattern = /\d{1,4}[\s×xX*/]{1,3}\d{1,4}/;
+      const hasTextMeasurement = pattern.test(txt);
+
+      // If L, B, H are all 0, there must be at least one text measurement
+      if (l === 0 && b === 0 && h === 0) {
+        return hasTextMeasurement ? 0 : 1;
+      }
+      return 0;
+    }
+
+    // Process all data rows
+    const results = [];
+    let totalRows = 0;
+    let validRows = 0;
+
+    for (let rowNum = firstDataRow; rowNum <= ws.lastRow.number; rowNum++) {
+      const row = ws.getRow(rowNum);
+      if (!row.hasValues) continue;
+
+      totalRows++;
+      
+      // Check Fert./Prüfhinweis
+      let fertPruefhinweisError = 0;
+      if (colMap.fertPruefhinweis !== undefined) {
+        const cell = row.getCell(colMap.fertPruefhinweis + 1);
+        fertPruefhinweisError = checkVollstaendig(cell.value);
+      }
+
+      // Check mandatory fields
+      const pflichtfelderError = checkPflichtfelder(row);
+      
+      // Check measurements
+      const massError = checkMasspruefung(row);
+      
+      // Overall error
+      const gesamtError = Math.max(fertPruefhinweisError, pflichtfelderError, massError);
+      
+      if (gesamtError === 0) {
+        validRows++;
+      }
+
+      // Add error columns to the row
+      row.splice(ws.columnCount + 1, 0, fertPruefhinweisError, pflichtfelderError, massError, gesamtError);
+      
+      results.push({
+        row: rowNum,
+        fertPruefhinweisError,
+        pflichtfelderError,
+        massError,
+        gesamtError
+      });
+    }
+
+    // Add error column headers
+    const headerRowObj2 = ws.getRow(headerRow);
+    headerRowObj2.splice(ws.columnCount + 1, 0, 
+      "Fehler_Vollständigkeit_Fert./Prüfhinweis",
+      "Fehler_Vollständigkeit_B-J+N+R-W", 
+      "Fehler_Maßprüfung",
+      "Fehler"
+    );
+
+    // Create quality report workbook
+    const qualityWb = new ExcelJS.Workbook();
+    
+    // Copy original data with error columns
+    const qualityWs = qualityWb.addWorksheet('Qualitätsbericht');
+    ws.eachRow((row, rowNumber) => {
+      const newRow = qualityWs.addRow(row.values);
+      
+      // Color code based on errors
+      if (rowNumber > headerRow) {
+        const errorCol = row.values.length - 1; // Last column is overall error
+        const errorValue = row.values[errorCol];
+        
+        if (errorValue === 1) {
+          // Red for errors
+          newRow.eachCell((cell, colNumber) => {
+            if (colNumber > ws.columnCount) {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFCCCC' } };
             }
           });
-          testProcess.on('error', reject);
-        });
-        console.log(`Using Python executable: ${exe}`);
-        break;
-      } catch (error) {
-        console.log(`${exe} not available`);
+        } else if (errorValue === 0) {
+          // Green for valid
+          newRow.eachCell((cell, colNumber) => {
+            if (colNumber > ws.columnCount) {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD5F4E6' } };
+            }
+          });
+        }
+      }
+    });
+
+    // Create release list (only valid rows)
+    const releaseWb = new ExcelJS.Workbook();
+    const releaseWs = releaseWb.addWorksheet('Freigabeliste');
+    
+    // Copy headers
+    const releaseHeaderRow = releaseWs.addRow(headers);
+    releaseHeaderRow.eachCell((cell, colNumber) => {
+      cell.font = { bold: true };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF99' } };
+    });
+
+    // Copy only valid rows
+    for (let rowNum = firstDataRow; rowNum <= ws.lastRow.number; rowNum++) {
+      const row = ws.getRow(rowNum);
+      if (!row.hasValues) continue;
+      
+      const errorCol = row.values.length - 1;
+      const errorValue = row.values[errorCol];
+      
+      if (errorValue === 0) {
+        // Only copy the original columns (not error columns)
+        const originalValues = row.values.slice(0, ws.columnCount);
+        releaseWs.addRow(originalValues);
       }
     }
 
-    if (!pythonExe) {
-      throw new Error('Kein Python-Interpreter gefunden. Bitte installieren Sie Python 3.');
-    }
+    // Create summary sheet
+    const summaryWs = qualityWb.addWorksheet('Zusammenfassung');
+    
+    const summaryData = [
+      ['', 'Fehleranzahl', 'Fehlerquote'],
+      [`Gesamt(${totalRows})`, totalRows - validRows, `${((totalRows - validRows) / totalRows * 100).toFixed(2)}%`],
+      ['Vollständigkeit_Pflichtfeld', results.filter(r => r.pflichtfelderError === 1).length, 
+       `${(results.filter(r => r.pflichtfelderError === 1).length / totalRows * 100).toFixed(2)}%`],
+      ['Vollständigkeit_Fert./Prüfhinweis', results.filter(r => r.fertPruefhinweisError === 1).length,
+       `${(results.filter(r => r.fertPruefhinweisError === 1).length / totalRows * 100).toFixed(2)}%`],
+      ['Gültigkeit_Maß', results.filter(r => r.massError === 1).length,
+       `${(results.filter(r => r.massError === 1).length / totalRows * 100).toFixed(2)}%`]
+    ];
 
-    // Run Python script
-    return new Promise((resolve, reject) => {
-      console.log(`Running Python script: ${pythonExe} ${tempPythonScript}`);
-      const python = spawn(pythonExe, [tempPythonScript], {
-        cwd: tempDir,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        timeout: 120000 // 2 minutes timeout
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      python.stdout.on('data', (data) => {
-        stdout += data.toString();
-        console.log('Python stdout:', data.toString());
-      });
-
-      python.stderr.on('data', (data) => {
-        stderr += data.toString();
-        console.error('Python stderr:', data.toString());
-      });
-
-      python.on('close', async (code) => {
-        try {
-          console.log(`Python process exited with code ${code}`);
-          console.log('Stdout:', stdout);
-          console.log('Stderr:', stderr);
-
-          if (code !== 0) {
-            reject(new Error(`Python script failed with code ${code}. Error: ${stderr || 'Unknown error'}`));
-            return;
-          }
-
-          // Check if output file exists
-          try {
-            await fs.access(outputFile);
-          } catch {
-            reject(new Error('Python script completed but output file was not created'));
-            return;
-          }
-
-          // Read results
-          const qualityBuffer = await fs.readFile(outputFile);
-          
-          // Create release list by reading the Excel file
-          const wb = new ExcelJS.Workbook();
-          await wb.xlsx.load(qualityBuffer);
-          
-          const releaseWb = new ExcelJS.Workbook();
-          const releaseWs = releaseWb.addWorksheet('Freigabeliste');
-          
-          // Look for sheet with error-free data
-          let sourceSheet = wb.getWorksheet('Ohne_Fehler');
-          if (!sourceSheet) {
-            // If no "Ohne_Fehler" sheet, try first sheet and filter
-            sourceSheet = wb.worksheets[0];
-          }
-
-          let totalRows = 0;
-          let validRows = 0;
-
-          if (sourceSheet) {
-            // Copy headers first
-            const headerRow = sourceSheet.getRow(1);
-            const newHeaderRow = releaseWs.addRow(headerRow.values);
-            
-            // Copy formatting for header
-            headerRow.eachCell((cell, colNumber) => {
-              const newCell = newHeaderRow.getCell(colNumber);
-              if (cell.fill) newCell.fill = cell.fill;
-              if (cell.font) newCell.font = cell.font;
-              if (cell.border) newCell.border = cell.border;
-              if (cell.alignment) newCell.alignment = cell.alignment;
-            });
-
-            // Copy data rows (skip header)
-            sourceSheet.eachRow((row, rowNumber) => {
-              if (rowNumber > 1) { // Skip header
-                totalRows++;
-                
-                // Check if this row has errors (if there's an error column)
-                let hasError = false;
-                const errorCol = row.values.findIndex(cell => 
-                  String(cell).includes('Fehler') || String(cell) === '1'
-                );
-                
-                if (errorCol === -1 || !row.getCell(errorCol).value) {
-                  validRows++;
-                  const newRow = releaseWs.addRow(row.values);
-                  
-                  // Copy formatting
-                  row.eachCell((cell, colNumber) => {
-                    const newCell = newRow.getCell(colNumber);
-                    if (cell.fill) newCell.fill = cell.fill;
-                    if (cell.font) newCell.font = cell.font;
-                    if (cell.border) newCell.border = cell.border;
-                    if (cell.alignment) newCell.alignment = cell.alignment;
-                  });
-                }
-              }
-            });
-          }
-          
-          const releaseBuffer = await releaseWb.xlsx.writeBuffer();
-
-          // Cleanup temp directory
-          await fs.rm(tempDir, { recursive: true, force: true });
-
-          resolve({
-            qualityReport: Array.from(qualityBuffer),
-            releaseList: Array.from(releaseBuffer),
-            stats: {
-              total: totalRows,
-              valid: validRows,
-              invalid: totalRows - validRows
-            }
-          });
-
-        } catch (error) {
-          console.error('Error processing Python results:', error);
-          await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
-          reject(error);
+    summaryData.forEach((row, index) => {
+      const newRow = summaryWs.addRow(row);
+      newRow.eachCell((cell, colNumber) => {
+        cell.alignment = { horizontal: 'center' };
+        if (index === 0) {
+          cell.font = { bold: true };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF99' } };
         }
       });
-
-      python.on('error', async (error) => {
-        console.error('Python process error:', error);
-        await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
-        reject(new Error(`Failed to start Python process: ${error.message}`));
-      });
-
-      // Handle timeout
-      setTimeout(() => {
-        python.kill('SIGTERM');
-        reject(new Error('Python script timed out after 2 minutes'));
-      }, 120000);
     });
 
+    // Set column widths
+    summaryWs.getColumn(1).width = 35;
+    summaryWs.getColumn(2).width = 14;
+    summaryWs.getColumn(3).width = 14;
+
+    // Generate buffers
+    const qualityBuffer = await qualityWb.xlsx.writeBuffer();
+    const releaseBuffer = await releaseWb.xlsx.writeBuffer();
+
+    return {
+      qualityReport: Array.from(qualityBuffer),
+      releaseList: Array.from(releaseBuffer),
+      stats: {
+        total: totalRows,
+        valid: validRows,
+        invalid: totalRows - validRows
+      }
+    };
+
   } catch (error) {
-    console.error('Quality check setup error:', error);
-    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
-    throw error;
+    console.error('Quality check error:', error);
+    throw new Error(`Qualitätsprüfung fehlgeschlagen: ${error.message}`);
   }
 }
 
