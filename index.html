@@ -375,7 +375,7 @@
 
       <!-- Step 1: Upload -->
       <div class="action-section" id="upload-section">
-        <h3>📁 Datei Upload</h3>
+        <h3>📁 Schritt 1: Datei Upload</h3>
         <div id="dropzone" class="dropzone">
           <div class="dropzone-icon">📁</div>
           <p id="dzText">
@@ -389,7 +389,7 @@
 
       <!-- Step 2: Web Search -->
       <div class="action-section disabled" id="web-search-section">
-        <h3>🔍 Web-Suche starten</h3>
+        <h3>🔍 Schritt 2: Web-Suche starten</h3>
         <div class="action-buttons">
           <button id="webSearchBtn" disabled>Web-Suche starten</button>
           <button id="downloadWebBtn" class="secondary" disabled>Web-Ergebnis herunterladen</button>
@@ -414,10 +414,22 @@
 
       <!-- Step 3: Quality Check -->
       <div class="action-section disabled" id="quality-section">
-        <h3>✅ Vollständigkeit & Richtigkeit prüfen</h3>
+        <h3>✅ Schritt 3: Vollständigkeit & Richtigkeit prüfen</h3>
         <div class="action-buttons">
           <button id="qualityCheckBtn" disabled>Vollständigkeit prüfen</button>
           <button id="downloadQualityBtn" class="secondary" disabled>Qualitätsbericht.xlsx</button>
+        </div>
+        
+        <!-- Quality Check Stats -->
+        <div id="qualityStats" class="stats-grid hidden">
+          <div class="stat-card green">
+            <div class="stat-number" id="completeCount">0</div>
+            <div class="stat-label">Vollständige & richtige Datensätze</div>
+          </div>
+          <div class="stat-card red">
+            <div class="stat-number" id="incompleteCount">0</div>
+            <div class="stat-label">Unvollständige oder unplausible Datensätze</div>
+          </div>
         </div>
       </div>
 
@@ -453,6 +465,10 @@
     const foundCount = document.getElementById('foundCount');
     const missingCount = document.getElementById('missingCount');
     const diffCount = document.getElementById('diffCount');
+    
+    const qualityStats = document.getElementById('qualityStats');
+    const completeCount = document.getElementById('completeCount');
+    const incompleteCount = document.getElementById('incompleteCount');
     
     // Steps
     const step1 = document.getElementById('step-1');
@@ -654,6 +670,40 @@
         qualityBlob = new Blob([buf], {
           type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         });
+        
+        // Get real statistics from the processed Excel file
+        const statsForm = new FormData();
+        statsForm.append('file', new File([qualityBlob], 'Qualitätsbericht.xlsx'));
+        
+        try {
+          const statsResp = await fetch('/api/quality-stats', {
+            method: 'POST',
+            body: statsForm
+          });
+          
+          if (statsResp.ok) {
+            const stats = await statsResp.json();
+            completeCount.textContent = stats.complete;
+            incompleteCount.textContent = stats.incomplete;
+            
+            // Debug info in console
+            if (stats.debug) {
+              console.log('Quality debug info:', stats.debug);
+              console.log('Found colors:', stats.debug.foundColors);
+            }
+          } else {
+            // Fallback to placeholder stats
+            completeCount.textContent = '?';
+            incompleteCount.textContent = '?';
+          }
+        } catch (statsErr) {
+          console.error('Error getting quality stats:', statsErr);
+          // Fallback to placeholder stats
+          completeCount.textContent = '?';
+          incompleteCount.textContent = '?';
+        }
+        
+        qualityStats.classList.remove('hidden');
         
         updateProgress(100);
         statusEl.textContent = 'Qualitätsprüfung abgeschlossen — Qualitätsbericht verfügbar.';

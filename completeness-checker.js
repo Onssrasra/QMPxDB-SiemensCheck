@@ -178,47 +178,58 @@ async function checkCompleteness(fileBuffer) {
       }
     }
 
-    // 2) Fert./Prüfhinweis invalid → orange
+    // 2) Fert./Prüfhinweis invalid → rot
     if (cFert){
       const val = rowS.getCell(cFert).value;
       if (!isEmpty(val) && !validFertPruef(val)){
-        rowQ.getCell(cFert).fill = FILL_ORANGE;
-        hasOrange = true;
+        rowQ.getCell(cFert).fill = FILL_RED;
+        hasRed = true;
       }
     }
 
-    // 3) Maße L/B/H: <0 → orange; all 0/empty & no text measure → orange
+    // 3) Maße L/B/H: <0 → rot; all 0/empty & no text measure → rot
     const vL = cL ? toNum(rowS.getCell(cL).value) : null;
     const vB = cB ? toNum(rowS.getCell(cB).value) : null;
     const vH = cH ? toNum(rowS.getCell(cH).value) : null;
     const vTxt = cTxt ? rowS.getCell(cTxt).value : null;
 
-    const markOrange = (c) => { if (c){ rowQ.getCell(c).fill = FILL_ORANGE; hasOrange = true; } };
+    const markRed = (c) => { if (c){ rowQ.getCell(c).fill = FILL_RED; hasRed = true; } };
 
     if ([vL, vB, vH].some(v => v != null && v < 0)){
-      markOrange(cL); markOrange(cB); markOrange(cH);
+      markRed(cL); markRed(cB); markRed(cH);
     } else {
       const allZeroOrNone = [vL, vB, vH].every(v => v == null || v === 0);
       if (allZeroOrNone && !hasTextMeasure(vTxt)){
-        markOrange(cL); markOrange(cB); markOrange(cH);
+        markRed(cL); markRed(cB); markRed(cH);
       }
     }
 
-    // 4) Gewicht <= 0 → orange (if present)
+    // 4) Gewicht <= 0 → rot (if present)
     if (cGew){
       const g = toNum(rowS.getCell(cGew).value);
       if (g != null && g <= 0){
-        rowQ.getCell(cGew).fill = FILL_ORANGE;
-        hasOrange = true;
+        rowQ.getCell(cGew).fill = FILL_RED;
+        hasRed = true;
       }
     }
     
-    // 5) Bruttogewicht <= 0 → orange (if present)
+    // 5) Bruttogewicht <= 0 → rot (if present)
     if (cBrutto){
       const bg = toNum(rowS.getCell(cBrutto).value);
       if (bg != null && bg <= 0){
-        rowQ.getCell(cBrutto).fill = FILL_ORANGE;
-        hasOrange = true;
+        rowQ.getCell(cBrutto).fill = FILL_RED;
+        hasRed = true;
+      }
+    }
+    
+    // 6) Bruttogewicht < Nettogewicht → rot (wenn beide vorhanden)
+    if (cBrutto && cGew){
+      const bg = toNum(rowS.getCell(cBrutto).value);
+      const ng = toNum(rowS.getCell(cGew).value);
+      if (bg != null && ng != null && bg < ng){
+        rowQ.getCell(cBrutto).fill = FILL_RED;
+        rowQ.getCell(cGew).fill = FILL_RED;
+        hasRed = true;
       }
     }
 
