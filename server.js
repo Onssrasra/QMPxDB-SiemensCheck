@@ -362,8 +362,13 @@ app.post('/api/process-excel', upload.single('file'), async (req, res) => {
 
           if (hasWeb) {
             ws.getCell(`${pair.webCol}${currentRow}`).value = webValue;
-            fillColor(ws, `${pair.webCol}${currentRow}`, hasDb ? (isEqual ? 'green' : 'red') : 'orange');
+            // Nur markieren wenn DB-Wert vorhanden ist
+            if (hasDb) {
+              fillColor(ws, `${pair.webCol}${currentRow}`, isEqual ? 'green' : 'red');
+            }
+            // Wenn DB-Wert fehlt, aber Web-Wert vorhanden → keine Markierung
           } else {
+            // Web-Wert fehlt, aber DB-Wert vorhanden → orange
             if (hasDb) fillColor(ws, `${pair.webCol}${currentRow}`, 'orange');
           }
         }
