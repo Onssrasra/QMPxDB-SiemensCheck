@@ -1,137 +1,139 @@
-/* utils.js */
-const { parseFloat } = require('mathjs');
+// utils.js - Normalisierung & Mapping (aktualisiert)
 
-// Konvertiert einen Wert zu einer Zahl
-function toNumber(v) {
-  if (v == null || v === '') return null;
-  const n = parseFloat(String(v).replace(',', '.'));
-  return isFinite(n) ? n : null;
+function a2vUrl(a2v) {
+  const id = (a2v || '').toString().trim();
+  return `https://www.mymobase.com/de/p/${id}`;
 }
 
-// Parst Gewichtswerte aus verschiedenen Formaten
-function parseWeight(weightText) {
-  if (!weightText || typeof weightText !== 'string') return { value: null, unit: null };
-  
-  const text = weightText.trim();
-  
-  // Verschiedene Gewichtsmuster
-  const patterns = [
-    /^(\d+[,.]?\d*)\s*(kg|g|lb|oz|t)$/i,
-    /^(\d+[,.]?\d*)\s*(kilo|gramm|pound|ounce|tonne)$/i,
-    /^(\d+[,.]?\d*)\s*(\w+)$/i
-  ];
-  
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match) {
-      const value = parseFloat(match[1].replace(',', '.'));
-      const unit = match[2].toLowerCase();
-      
-      if (isFinite(value)) {
-        // Einheit zu kg konvertieren
-        const kgValue = weightToKg(value, unit);
-        return { value: kgValue, unit: 'kg' };
-      }
-    }
-  }
-  
-  return { value: null, unit: null };
+function cleanNumberString(s) {
+  if (s == null) return null;
+  const str = String(s).replace(/\s+/g, '').replace(',', '.'); // 12,3 -> 12.3
+  return str;
 }
 
-// Konvertiert verschiedene Gewichtseinheiten zu kg
+function toNumber(val) {
+  if (val == null || val === '') return null;
+  const s = cleanNumberString(val);
+  const m = s ? s.match(/-?\d+(?:\.\d+)?/) : null;
+  if (!m) return null;
+  return parseFloat(m[0]);
+}
+
+// Gewicht: parse "0,162 kg" => { value: 0.162, unit: 'kg' }
+function parseWeight(value) {
+  if (!value && value !== 0) return { value: null, unit: '' };
+  const s = String(value).toLowerCase().replace(',', '.').trim();
+  const m = s.match(/-?\d+(?:\.\d+)?/);
+  const num = m ? parseFloat(m[0]) : null;
+  let unit = '';
+  if (/mg\b/.test(s)) unit = 'mg';
+  else if (/\bg\b/.test(s) && !/\bkg\b/.test(s)) unit = 'g';
+  else if (/\bkg\b/.test(s)) unit = 'kg';
+  else if (/\bt\b/.test(s)) unit = 't';
+  return { value: num, unit };
+}
+
+// Für Vergleich: in kg umrechnen
 function weightToKg(value, unit) {
-  const unitMap = {
-    'kg': 1,
-    'kilo': 1,
-    'g': 0.001,
-    'gramm': 0.001,
-    'lb': 0.453592,
-    'pound': 0.453592,
-    'oz': 0.0283495,
-    'ounce': 0.0283495,
-    't': 1000,
-    'tonne': 1000
-  };
-  
-  const multiplier = unitMap[unit] || 1;
-  return value * multiplier;
+  if (value == null) return null;
+  const u = (unit || '').toLowerCase();
+  if (u === 'mg') return value / 1e6;
+  if (u === 'g') return value / 1000;
+  if (u === 'kg' || u === '') return value;
+  if (u === 't') return value * 1000;
+  return value;
 }
 
-// Parst Dimensionen (Länge x Breite x Höhe) aus Text
-function parseDimensionsToLBH(dimText) {
-  if (!dimText || typeof dimText !== 'string') return { L: null, B: null, H: null };
+/**
+ * Dimensions-Parser:
+ * - akzeptiert "L×B×H", "LxBxH", "40X40X42", "30x20x10 mm", etc.
+ * - Standard-Reihenfolge: Länge × Breite × Höhe (L×B×H)
+ * - unterstützt auch Zylinder-Formate: "D×H", "DxH", "20x30 mm" (Durchmesser x Höhe)
+ * - Ergebnis in mm (falls Einheiten erkennbar), sonst roh.
+ */
+function parseDimensionsToLBH(text) {
+  if (!text) return { L: null, B: null, H: null };
+  const raw = String(text).trim();
+
+  // 1) Einheit in mm|cm|m erkennen, aber entfernen
+  let scale = 1;
+  let s = raw.toLowerCase()
+             .replace(/[,;]/g, '.')          // Komma oder Semikolon → Punkt
+             .replace(/\s+/g, '')            // Leerzeichen killen
+             .replace(/[×xX*/]/g, 'x');      // *, ×, X, / → x
+
+  if (/cm\b/.test(s)) { scale = 10;  s = s.replace(/cm\b/g, ''); }
+  if (/(^|\D)m\b/.test(s)) { scale = 1000; s = s.replace(/m\b/g, ''); }
+
+  // 2) Bis zu 3 Zahlen extrahieren - verbesserte Regex für verschiedene Formate
+  const nums = (s.match(/-?\d+(?:\.\d+)?/g) || []).map(parseFloat);
   
-  const text = dimText.trim();
+  let L, B, H;
   
-  // Verschiedene Dimensionsmuster
-  const patterns = [
-    /(\d+[,.]?\d*)\s*[xX×]\s*(\d+[,.]?\d*)\s*[xX×]\s*(\d+[,.]?\d*)/,
-    /(\d+[,.]?\d*)\s*[xX×]\s*(\d+[,.]?\d*)/,
-    /(\d+[,.]?\d*)\s*mm/,
-    /(\d+[,.]?\d*)\s*cm/,
-    /(\d+[,.]?\d*)\s*m/
-  ];
-  
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match) {
-      const values = match.slice(1).map(v => parseFloat(v.replace(',', '.')));
-      
-      if (values.length === 3) {
-        return { L: values[0], B: values[1], H: values[2] };
-      } else if (values.length === 2) {
-        return { L: values[0], B: values[1], H: null };
-      } else if (values.length === 1) {
-        return { L: values[0], B: null, H: null };
-      }
-    }
+  if (nums.length === 2) {
+    // Zylinder-Format: Durchmesser x Höhe
+    // Durchmesser = Breite (B), Höhe = Höhe (H), Länge = null
+    L = null;
+    B = nums[0] != null ? Math.round(nums[0] * scale) : null;
+    H = nums[1] != null ? Math.round(nums[1] * scale) : null;
+    console.log(`Parsed cylinder dimensions: "${raw}" -> Durchmesser:${B}, Höhe:${H}`);
+  } else if (nums.length === 3) {
+    // Quader-Format: Länge x Breite x Höhe (Standard-Reihenfolge)
+    [L, B, H] = nums.map(n => n != null ? Math.round(n * scale) : null);
+    console.log(`Parsed cuboid dimensions: "${raw}" -> Länge:${L}, Breite:${B}, Höhe:${H}`);
+  } else {
+    // Unbekanntes Format
+    L = B = H = null;
+    console.log(`Unknown dimension format: "${raw}"`);
   }
-  
-  return { L: null, B: null, H: null };
+
+  return { L, B, H };
 }
 
-// Normalisiert Artikelnummern für den Vergleich
-function normPartNo(partNo) {
-  if (!partNo) return '';
-  return String(partNo).trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+function normPartNo(s) {
+  if (!s) return '';
+  return String(s).toUpperCase().replace(/[\s\-\/_]+/g, '');
 }
 
-// Normalisiert N-Codes für den Vergleich
-function normalizeNCode(code) {
-  if (!code) return '';
-  return String(code).trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+function withinToleranceKG(exKg, wbKg, tolPct) {
+  if (exKg == null || wbKg == null) return false;
+  const diff = Math.abs(exKg - wbKg);
+  if (!tolPct || tolPct <= 0) return diff < 1e-9; // streng
+  const tol = Math.abs(exKg) * (tolPct / 100);
+  return diff <= tol;
 }
 
-// Mappt Materialklassifizierung zu Excel-Format
-function mapMaterialClassificationToExcel(classification) {
-  if (!classification) return null;
-  
-  const mapping = {
-    'Kunststoff': 'K',
-    'Metall': 'M',
-    'Holz': 'H',
-    'Glas': 'G',
-    'Keramik': 'C',
-    'Textil': 'T',
-    'Papier': 'P'
-  };
-  
-  const text = String(classification).trim();
-  for (const [key, value] of Object.entries(mapping)) {
-    if (text.toLowerCase().includes(key.toLowerCase())) {
-      return value;
-    }
+function mapMaterialClassificationToExcel(text) {
+  if (!text) return '';
+  const s = String(text).toLowerCase();
+  const hasNicht = /nicht/.test(s);
+  const hasSchweiss = /schwei|schweiß|schweiss/.test(s);
+  const hasGuss = /guss/.test(s);
+  const hasKlebe = /klebe/.test(s);
+  const hasSchmiede = /schmiede/.test(s);
+  const hasRelevant = /relev/.test(s);
+  if (hasNicht && (hasSchweiss || hasGuss || hasKlebe || hasSchmiede) && hasRelevant) {
+    return 'OHNE/N/N/N/N';
   }
-  
-  return classification; // Fallback: Original zurückgeben
+  return '';
+}
+
+// „OHNE/N  /N  /N/N “ -> "OHNE/N/N/N/N"
+function normalizeNCode(s) {
+  if (!s) return '';
+  return String(s).replace(/\s+/g,'').toUpperCase();
 }
 
 module.exports = {
+  a2vUrl,
+  cleanNumberString,
   toNumber,
   parseWeight,
   weightToKg,
   parseDimensionsToLBH,
   normPartNo,
+  withinToleranceKG,
   mapMaterialClassificationToExcel,
   normalizeNCode
-}; 
+};

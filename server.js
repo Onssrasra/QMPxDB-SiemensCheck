@@ -1,4 +1,3 @@
-/* server.js */
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -16,7 +15,7 @@ const {
   normalizeNCode
 } = require('./utils');
 const { SiemensProductScraper, a2vUrl } = require('./scraper');
-const { checkCompleteness } = require('./completeness-checker.js');
+const { checkCompleteness } = require('./completeness-checker');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -59,7 +58,6 @@ function getColumnLetter(index) {
   }
   return result;
 }
-
 function getColumnIndex(letter) {
   let index = 0;
   for (let i = 0; i < letter.length; i++) {
@@ -113,7 +111,6 @@ function fillColor(ws, addr, color) {
   };
   ws.getCell(addr).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: map[color] || map.green } };
 }
-
 function copyColumnFormatting(ws, fromCol, toCol, rowStart, rowEnd) {
   for (let row = rowStart; row <= rowEnd; row++) {
     const fromCell = ws.getCell(`${fromCol}${row}`);
@@ -125,7 +122,6 @@ function copyColumnFormatting(ws, fromCol, toCol, rowStart, rowEnd) {
     if (fromCell.style)     Object.assign(toCell.style, fromCell.style);
   }
 }
-
 function applyLabelCellFormatting(ws, addr, isWebCell = false) {
   const cell = ws.getCell(addr);
   fillColor(ws, addr, isWebCell ? 'webBlue' : 'dbBlue');
@@ -136,25 +132,20 @@ function applyLabelCellFormatting(ws, addr, isWebCell = false) {
 
 // -------- Vergleichslogik ----------
 function hasValue(v){ return v!==null && v!==undefined && v!=='' && String(v).trim()!==''; }
-
 function eqText(a,b){
   if (a==null||b==null) return false;
   const A=String(a).trim().toLowerCase().replace(/\s+/g,' ');
   const B=String(b).trim().toLowerCase().replace(/\s+/g,' ');
   return A===B;
 }
-
 function eqPart(a,b){ return normPartNo(a)===normPartNo(b); }
-
 function eqN(a,b){ return normalizeNCode(a)===normalizeNCode(b); }
-
 function eqWeight(exS, webVal){
   const { value: wv } = parseWeight(webVal);
   if (wv==null) return false;
   const exNum = toNumber(exS); if (exNum==null) return false;
   return Math.abs(exNum - wv) < 1e-9;
 }
-
 function eqDimension(exVal, webDimText, dimType){
   const exNum = toNumber(exVal); if (exNum==null) return false;
   const d = parseDimensionsToLBH(webDimText);
@@ -165,30 +156,34 @@ function eqDimension(exVal, webDimText, dimType){
 
 // -------- Top-Header (Zeile 1) --------
 function applyTopHeader(ws) {
-  // Wir behalten die ursprüngliche erste Zeile unverändert
-  // Keine Änderungen an Zeile 1 vornehmen
-  
-  // Falls Zeile 1 leer ist, können wir sie mit Standardwerten füllen
-  // Aber nur wenn sie wirklich leer ist
+  // Fills (Hintergründe) sichern
+  const b1Fill  = ws.getCell('B1').fill;
+  const ag1Fill = ws.getCell('AG1').fill;
+  const ah1Fill = ws.getCell('AH1').fill;
+
+  // evtl. vorhandene Merges lösen
+  try { ws.unMergeCells('B1:AF1'); } catch {}
+  try { ws.unMergeCells('AH1:AJ1'); } catch {}
+
+  // B1:AF1
+  ws.mergeCells('B1:AF1');
   const b1 = ws.getCell('B1');
+  b1.value = 'DB AG SAP R/3 K MARA Stammdaten Stand 20.Mai 2025';
+  if (b1Fill) b1.fill = b1Fill;
+  b1.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+
+  // AG1 (einzeln)
   const ag1 = ws.getCell('AG1');
+  ag1.value = 'SAP Klassifizierung aus Okt24';
+  if (ag1Fill) ag1.fill = ag1Fill;
+  ag1.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+
+  // AH1:AJ1
+  ws.mergeCells('AH1:AJ1');
   const ah1 = ws.getCell('AH1');
-  
-  // Nur füllen wenn die Zellen leer sind
-  if (!b1.value || b1.value === '') {
-    b1.value = 'DB AG SAP R/3 K MARA Stammdaten';
-    b1.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-  }
-  
-  if (!ag1.value || ag1.value === '') {
-    ag1.value = 'SAP Klassifizierung';
-    ag1.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-  }
-  
-  if (!ah1.value || ah1.value === '') {
-    ah1.value = 'Zusatz Herstellerdaten';
-    ah1.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-  }
+  ah1.value = 'Zusatz Herstellerdaten aus Abfragen in 2024';
+  if (ah1Fill) ah1.fill = ah1Fill;
+  ah1.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 }
 
 // -------- NEU: Header-Zeilen 2 & 3 pro DB/Web-Paar zusammenfassen --------
@@ -239,7 +234,6 @@ app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISO
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
-// Websuche-Endpunkt
 app.post('/api/process-excel', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Bitte Excel-Datei hochladen (file).' });
@@ -378,7 +372,7 @@ app.post('/api/process-excel', upload.single('file'), async (req, res) => {
 
     const out = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition','attachment; filename="DB_Produktvergleich_verarbeitet.xlsx"');
+    res.setHeader('Content-Disposition','attachment; filename="Web_Vergleich_Ergebnis.xlsx"');
     res.send(Buffer.from(out));
 
   } catch (err) {
@@ -387,16 +381,16 @@ app.post('/api/process-excel', upload.single('file'), async (req, res) => {
   }
 });
 
-// Vollständigkeitsprüfung-Endpunkt
+// Neue Route für Vollständigkeitsprüfung
 app.post('/api/check-completeness', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Bitte Excel-Datei hochladen (file).' });
 
-    const resultBuffer = await checkCompleteness(req.file.buffer);
+    const result = await checkCompleteness(req.file.buffer);
     
     res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition','attachment; filename="Vollstaendigkeitspruefung.xlsx"');
-    return res.send(Buffer.from(resultBuffer));
+    res.setHeader('Content-Disposition','attachment; filename="Qualitätsbericht.xlsx"');
+    res.send(Buffer.from(result));
 
   } catch (err) {
     console.error(err);
@@ -404,14 +398,4 @@ app.post('/api/check-completeness', upload.single('file'), async (req, res) => {
   }
 });
 
-// Graceful shutdown
-process.on('SIGINT', async () => {
-  console.log('\nGraceful shutdown...');
-  await scraper.close();
-  process.exit(0);
-});
-
-app.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
-  console.log(`Websuche mit ${SCRAPE_CONCURRENCY} parallelen Anfragen`);
-});
+app.listen(PORT, () => console.log(`Server running at http://0.0.0.0:${PORT}`));
