@@ -152,9 +152,9 @@ async function checkCompleteness(fileBuffer) {
   const cH    = colByHeader(src, 'Höhe');
   const cTxt  = colByHeader(src, 'Materialkurztext');
   
-  // Gewichtsspalten direkt nach Excel-Spalten (R=18, S=19)
-  const cGew  = 18;  // Spalte R - Nettogewicht
-  const cBrutto = 19; // Spalte S - Bruttogewicht
+  // Gewichtsspalten nach Header-Namen (aus Zeile 3)
+  const cNetto = colByHeader(src, 'Nettogewicht');
+  const cBrutto = colByHeader(src, 'Bruttogewicht');
 
   // Iterate data rows (from row 4)
   const last = src.lastRow ? src.lastRow.number : FIRST_DATA_ROW - 1;
@@ -165,7 +165,6 @@ async function checkCompleteness(fileBuffer) {
     if (!rowS || rowS.cellCount === 0) continue;
 
     let hasRed = false;
-    let hasOrange = false;
 
     // 1) Pflichtfelder (B–J, N, R–W): mark red if empty
     for (const {start, end} of MUST_COL_RANGES){
@@ -205,10 +204,10 @@ async function checkCompleteness(fileBuffer) {
     }
 
     // 4) Nettogewicht <= 0 → rot (nur diese Spalte)
-    if (cGew){
-      const g = toNum(rowS.getCell(cGew).value);
+    if (cNetto){
+      const g = toNum(rowS.getCell(cNetto).value);
       if (g != null && g <= 0){
-        rowQ.getCell(cGew).fill = FILL_RED;
+        rowQ.getCell(cNetto).fill = FILL_RED;
         hasRed = true;
       }
     }
@@ -223,9 +222,9 @@ async function checkCompleteness(fileBuffer) {
     }
     
     // 6) Bruttogewicht < Nettogewicht → rot (nur die falsche Spalte)
-    if (cBrutto && cGew){
+    if (cBrutto && cNetto){
       const bg = toNum(rowS.getCell(cBrutto).value);
-      const ng = toNum(rowS.getCell(cGew).value);
+      const ng = toNum(rowS.getCell(cNetto).value);
       if (bg != null && ng != null && bg < ng){
         // Nur die Spalte markieren, die den falschen Wert hat
         // Wenn Bruttogewicht kleiner als Nettogewicht, dann ist Bruttogewicht falsch
@@ -234,8 +233,8 @@ async function checkCompleteness(fileBuffer) {
       }
     }
 
-    // 6) If row has neither red nor orange → whole row green
-    if (!hasRed && !hasOrange){
+    // 7) If row has no red → whole row green
+    if (!hasRed){
       for (let c = 1; c <= src.columnCount; c++){
         rowQ.getCell(c).fill = FILL_GREEN;
       }

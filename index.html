@@ -336,11 +336,14 @@
       .dropzone { padding: 15px; min-height: 80px; }
       .action-buttons { flex-direction: column; align-items: stretch; }
       button { min-width: auto; }
+      .pipeline-steps { flex-direction: column; gap: 12px; }
+      .pipeline-steps::before { display: none; }
     }
 
     @media (max-height: 700px) {
       .card { padding: 20px; }
       .header { margin-bottom: 20px; }
+      .pipeline-steps { margin-bottom: 20px; }
       .action-section { margin-bottom: 20px; }
       .dropzone { min-height: 80px; padding: 15px; }
     }
@@ -361,15 +364,15 @@
       <div class="pipeline-steps">
         <div class="step active" id="step-1">
           <div class="step-number">1</div>
-          <div class="step-title">Datei Upload</div>
+          <div class="step-title">📁 Datei Upload</div>
         </div>
         <div class="step" id="step-2">
           <div class="step-number">2</div>
-          <div class="step-title">Web-Suche</div>
+          <div class="step-title">🔍 Web-Suche</div>
         </div>
         <div class="step" id="step-3">
           <div class="step-number">3</div>
-          <div class="step-title">Qualitätsprüfung</div>
+          <div class="step-title">✅ Vollständigkeit & Plausibilität prüfen</div>
         </div>
       </div>
 
@@ -392,7 +395,7 @@
         <h3>🔍 Web-Suche</h3>
         <div class="action-buttons">
           <button id="webSearchBtn" disabled>Web-Suche starten</button>
-          <button id="downloadWebBtn" class="secondary" disabled>Excel herunterladen</button>
+          <button id="downloadWebBtn" class="secondary" disabled>Web-Ergebnis herunterladen</button>
         </div>
         
         <!-- Web Search Stats -->
@@ -416,8 +419,8 @@
       <div class="action-section disabled" id="quality-section">
         <h3>✅ Vollständigkeit & Plausibilität prüfen</h3>
         <div class="action-buttons">
-          <button id="qualityCheckBtn" disabled>Qualitätsprüfung starten</button>
-          <button id="downloadQualityBtn" class="secondary" disabled>Excel herunterladen</button>
+          <button id="qualityCheckBtn" disabled>Vollständigkeit prüfen</button>
+          <button id="downloadQualityBtn" class="secondary" disabled>Qualitätsbericht.xlsx</button>
         </div>
         
         <!-- Quality Check Stats -->
