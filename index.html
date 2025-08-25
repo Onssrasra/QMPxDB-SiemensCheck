@@ -572,7 +572,7 @@
         
         // Get real statistics from the processed Excel file
         const statsForm = new FormData();
-        statsForm.append('file', selectedFile);
+        statsForm.append('file', new File([webProcessedBlob], 'Web_Vergleich_Ergebnis.xlsx'));
         
         try {
           const statsResp = await fetch('/api/web-search-stats', {
