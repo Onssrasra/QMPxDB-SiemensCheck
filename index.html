@@ -67,13 +67,75 @@
       margin-bottom: 15px;
     }
     
-    .divider {
-      width: 100%;
-      height: 3px;
-      background: var(--db-red);
-      border-radius: 2px;
-      margin: 0 auto;
-    }
+          .divider {
+        width: 100%;
+        height: 3px;
+        background: var(--db-red);
+        border-radius: 2px;
+        margin: 0 auto;
+      }
+
+      /* Pipeline Steps */
+      .pipeline-steps {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 25px;
+        position: relative;
+      }
+
+      .pipeline-steps::before {
+        content: '';
+        position: absolute;
+        top: 16px;
+        left: 10%;
+        right: 10%;
+        height: 2px;
+        background: var(--grey-3);
+        z-index: 1;
+      }
+
+      .step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        flex: 1;
+        position: relative;
+        z-index: 2;
+      }
+
+      .step-number {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--grey-3);
+        color: var(--white);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        margin-bottom: 6px;
+        font-size: 14px;
+      }
+
+      .step.active .step-number {
+        background: var(--db-red);
+      }
+
+      .step.completed .step-number {
+        background: var(--green);
+      }
+
+      .step-title {
+        font-weight: 600;
+        margin-bottom: 2px;
+        font-size: 13px;
+      }
+
+      .step-desc {
+        font-size: 10px;
+        color: var(--grey-4);
+      }
 
     /* Dropzone - kompakter */
     .dropzone {
@@ -295,6 +357,22 @@
         <div class="divider"></div>
       </div>
 
+      <!-- Pipeline Steps -->
+      <div class="pipeline-steps">
+        <div class="step active" id="step-1">
+          <div class="step-number">1</div>
+          <div class="step-title">Upload</div>
+        </div>
+        <div class="step" id="step-2">
+          <div class="step-number">2</div>
+          <div class="step-title">Web-Suche</div>
+        </div>
+        <div class="step" id="step-3">
+          <div class="step-number">3</div>
+          <div class="step-title">Qualitätsprüfung</div>
+        </div>
+      </div>
+
       <!-- Step 1: Upload -->
       <div class="action-section" id="upload-section">
         <h3>📁 Schritt 1: Datei Upload</h3>
@@ -375,12 +453,29 @@
     const foundCount = document.getElementById('foundCount');
     const missingCount = document.getElementById('missingCount');
     const diffCount = document.getElementById('diffCount');
+    
+    // Steps
+    const step1 = document.getElementById('step-1');
+    const step2 = document.getElementById('step-2');
+    const step3 = document.getElementById('step-3');
 
     let selectedFile = null;
     let webProcessedBlob = null;
     let qualityBlob = null;
 
     /* ==================== HELPER FUNCTIONS ==================== */
+    function updateStep(stepNum, status) {
+      const steps = [step1, step2, step3];
+      steps.forEach((step, i) => {
+        step.classList.remove('active', 'completed');
+        if (i + 1 < stepNum || (i + 1 === stepNum && status === 'completed')) {
+          step.classList.add('completed');
+        } else if (i + 1 === stepNum && status === 'active') {
+          step.classList.add('active');
+        }
+      });
+    }
+
     function enableSection(section, enable = true) {
       if (enable) {
         section.classList.remove('disabled');
@@ -439,6 +534,9 @@
       webSearchBtn.disabled = false;
       qualityCheckBtn.disabled = false;
       
+      // Update pipeline steps
+      updateStep(2, 'active');
+      
       statusEl.textContent = 'Datei erfolgreich hochgeladen — Web-Suche starten oder direkt zur Qualitätsprüfung.';
     }
 
@@ -472,42 +570,45 @@
           type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         });
         
-        // Parse Excel to get real statistics
-        const workbook = new ExcelJS.Workbook();
-        await workbook.xlsx.load(buf);
-        const worksheet = workbook.worksheets[0];
+        // Get real statistics from the processed Excel file
+        const statsForm = new FormData();
+        statsForm.append('file', selectedFile);
         
-        let greenCount = 0;  // Übereinstimmungen (grün)
-        let redCount = 0;    // Abweichungen (rot)
-        let orangeCount = 0; // Fehlende Web-Werte (orange)
-        
-        // Count colored cells in web value columns
-        const lastRow = worksheet.lastRow ? worksheet.lastRow.number : 0;
-        for (let r = 5; r <= lastRow; r++) { // Start from row 5 (after labels)
-          for (let c = 1; c <= worksheet.columnCount; c++) {
-            const cell = worksheet.getCell(r, c);
-            if (cell.fill && cell.fill.fgColor) {
-              const color = cell.fill.fgColor.argb;
-              if (color === 'FFD5F4E6') { // Green - Übereinstimmung
-                greenCount++;
-              } else if (color === 'FFFDEAEA') { // Red - Abweichung
-                redCount++;
-              } else if (color === 'FFFFEAA7') { // Orange - Fehlender Wert
-                orangeCount++;
-              }
-            }
+        try {
+          const statsResp = await fetch('/api/web-search-stats', {
+            method: 'POST',
+            body: statsForm
+          });
+          
+          if (statsResp.ok) {
+            const stats = await statsResp.json();
+            foundCount.textContent = stats.green;
+            diffCount.textContent = stats.red;
+            missingCount.textContent = stats.orange;
+          } else {
+            // Fallback to placeholder stats
+            foundCount.textContent = '?';
+            diffCount.textContent = '?';
+            missingCount.textContent = '?';
           }
+        } catch (statsErr) {
+          console.error('Error getting stats:', statsErr);
+          // Fallback to placeholder stats
+          foundCount.textContent = '?';
+          diffCount.textContent = '?';
+          missingCount.textContent = '?';
         }
         
-        foundCount.textContent = greenCount;
-        diffCount.textContent = redCount;
-        missingCount.textContent = orangeCount;
         webStats.classList.remove('hidden');
         
         updateProgress(100);
         statusEl.textContent = 'Web-Suche abgeschlossen — Ergebnis herunterladen oder zur Qualitätsprüfung.';
         
         downloadWebBtn.disabled = false;
+        
+        // Update pipeline steps
+        updateStep(2, 'completed');
+        updateStep(3, 'active');
         
       } catch (err) {
         statusEl.textContent = 'Fehler bei Web-Suche: ' + err.message;
@@ -552,6 +653,9 @@
         statusEl.textContent = 'Qualitätsprüfung abgeschlossen — Qualitätsbericht verfügbar.';
         
         downloadQualityBtn.disabled = false;
+        
+        // Update pipeline steps
+        updateStep(3, 'completed');
         
       } catch (err) {
         statusEl.textContent = 'Fehler bei Qualitätsprüfung: ' + err.message;

@@ -398,4 +398,47 @@ app.post('/api/check-completeness', upload.single('file'), async (req, res) => {
   }
 });
 
+// Neue Route für Web-Suche Statistiken
+app.post('/api/web-search-stats', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Bitte Excel-Datei hochladen (file).' });
+
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(req.file.buffer);
+    const ws = wb.worksheets[0];
+    
+    let greenCount = 0;  // Übereinstimmungen (grün)
+    let redCount = 0;    // Abweichungen (rot)
+    let orangeCount = 0; // Fehlende Web-Werte (orange)
+    
+    // Count colored cells in web value columns
+    const lastRow = ws.lastRow ? ws.lastRow.number : 0;
+    for (let r = 5; r <= lastRow; r++) { // Start from row 5 (after labels)
+      for (let c = 1; c <= ws.columnCount; c++) {
+        const cell = ws.getCell(r, c);
+        if (cell.fill && cell.fill.fgColor) {
+          const color = cell.fill.fgColor.argb;
+          if (color === 'FFD5F4E6') { // Green - Übereinstimmung
+            greenCount++;
+          } else if (color === 'FFFDEAEA') { // Red - Abweichung
+            redCount++;
+          } else if (color === 'FFFFEAA7') { // Orange - Fehlender Wert
+            orangeCount++;
+          }
+        }
+      }
+    }
+    
+    res.json({
+      green: greenCount,
+      red: redCount,
+      orange: orangeCount
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(PORT, () => console.log(`Server running at http://0.0.0.0:${PORT}`));

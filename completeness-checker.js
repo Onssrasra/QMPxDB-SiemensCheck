@@ -151,7 +151,10 @@ async function checkCompleteness(fileBuffer) {
   const cB    = colByHeader(src, 'Breite');
   const cH    = colByHeader(src, 'Höhe');
   const cTxt  = colByHeader(src, 'Materialkurztext');
-  const cGew  = colByHeader(src, 'Gewicht'); // optional
+  
+  // Gewichtsspalten direkt nach Excel-Spalten (R=18, S=19)
+  const cGew  = 18;  // Spalte R - Nettogewicht
+  const cBrutto = 19; // Spalte S - Bruttogewicht
 
   // Iterate data rows (from row 4)
   const last = src.lastRow ? src.lastRow.number : FIRST_DATA_ROW - 1;
@@ -209,8 +212,17 @@ async function checkCompleteness(fileBuffer) {
         hasOrange = true;
       }
     }
+    
+    // 5) Bruttogewicht <= 0 → orange (if present)
+    if (cBrutto){
+      const bg = toNum(rowS.getCell(cBrutto).value);
+      if (bg != null && bg <= 0){
+        rowQ.getCell(cBrutto).fill = FILL_ORANGE;
+        hasOrange = true;
+      }
+    }
 
-    // 5) If row has neither red nor orange → whole row green
+    // 6) If row has neither red nor orange → whole row green
     if (!hasRed && !hasOrange){
       for (let c = 1; c <= src.columnCount; c++){
         rowQ.getCell(c).fill = FILL_GREEN;

@@ -1,106 +1,169 @@
-# Clickbot - Vollständigkeitsprüfung & Websuche
+# QMP Siemens Produktcheck - DB vs. Web Vergleich
 
-Eine Web-Anwendung zur Excel-Datei-Verarbeitung mit Vollständigkeitsprüfung und Websuche-Funktionalität.
+Ein Tool zur Verarbeitung von Excel-Dateien mit Siemens-Produktdaten, das Web-Daten von MyMobase scraped und mit DB-Daten vergleicht.
 
-## Features
+## 🆕 Neue Features (Version 2.1)
 
-### 1. Vollständigkeitsprüfung
-- **Pflichtfelder prüfen** (Spalten B-J, N, R-W): Werden rot markiert wenn leer
-- **Fert./Prüfhinweis validieren**: Ungültige Werte werden orange markiert
-- **Maße validieren** (Länge, Breite, Höhe): Negative Werte oder ungültige Kombinationen werden orange markiert
-- **Gewicht prüfen**: Werte ≤ 0 werden orange markiert
-- **Farbkodierung**: 
-  - 🔴 Rot = Pflichtfeld fehlt
-  - 🟠 Orange = Ungültiger/unplausibler Wert
-  - 🟢 Grün = Zeile ist vollständig und korrekt
+### Neues Layout: Spaltenblöcke
+- **Jeder Fachbegriff bildet einen Spaltenblock** mit DB-Wert (links) und Web-Wert (rechts)
+- **Keine zusätzlichen Zeilen** - Web-Daten werden in die gleichen Zeilen geschrieben
+- **Übersichtliche Struktur** für bessere Vergleichbarkeit
 
-### 2. Websuche (Echo-Funktion)
-- Lädt Excel-Dateien hoch und gibt sie unverändert zurück
-- Für bestehende Websuche-Logik gedacht
+### Exakte Vergleiche ohne Toleranz
+- **Stringfelder**: Exakte Gleichheit nach Trim (case-sensitive)
+- **Gewichte**: Exakte Gleichheit der Zahlen in kg
+- **Maße**: Exakte Integer-Gleichheit in mm
 
-## Ausgabe
+### Farbkodierung
+- 🟢 **Grün**: Exakte Übereinstimmung zwischen DB und Web
+- 🔴 **Rot**: Beide Werte vorhanden, aber ungleich
+- 🟠 **Orange**: Mindestens ein Wert fehlt
 
-Die Vollständigkeitsprüfung erstellt eine neue Excel-Datei mit einem Arbeitsblatt:
-1. **"Qualitätsbericht"**: Ursprüngliche Daten mit Farbkodierung
-   - 🔴 Rot = Pflichtfeld fehlt
-   - 🟠 Orange = Ungültiger/unplausibler Wert  
-   - 🟢 Grün = Zeile ist vollständig und korrekt
+## 📊 Tabellenstruktur
 
-## Installation
+### Eingangstabelle
+- **Header in Zeile 3**: Materialkurztext, Her.-Artikelnummer, Fert./Prüfhinweis, Werkstoff, Nettogewicht, Länge, Breite, Höhe
+- **Daten ab Zeile 4**: Produkt-ID (A2V) in der entsprechenden Spalte
+- **Dynamische Spaltenerkennung** basierend auf Header-Text
 
-1. **Repository klonen:**
-   ```bash
-   git clone <your-repo-url>
-   cd clickbot-completeness-app
-   ```
+### Ausgangstabelle
+- **Zeile 3**: Hauptüberschriften als zusammengefasste Blöcke
+- **Zeile 4**: Unterüberschriften "DB-Wert" und "Web-Wert"
+- **Daten ab Zeile 5**: DB-Werte (links) und Web-Werte (rechts) in den entsprechenden Spalten
 
-2. **Abhängigkeiten installieren:**
-   ```bash
-   npm install
-   ```
+## 🚀 Verwendung
 
-3. **Server starten:**
-   ```bash
-   npm start
-   ```
+1. **Excel-Datei hochladen** über die Web-Oberfläche
+2. **Verarbeiten** klicken - das System:
+   - Erkennt A2V-Nummern automatisch
+   - Scraped Web-Daten von MyMobase
+   - Erstellt neue Tabelle mit dem gewünschten Layout
+   - Führt exakte Vergleiche durch
+   - Markiert Web-Zellen entsprechend der Farbkodierung
+3. **Herunterladen** der verarbeiteten Excel-Datei
 
-4. **Im Browser öffnen:**
-   ```
-   http://localhost:3000
-   ```
+## 🔧 Technische Details
 
-## Verwendung
-
-1. **Excel-Datei hochladen:**
-   - Datei per Drag & Drop oder Klick auswählen
-   - **Wichtig**: Header müssen in Zeile 3 stehen, Daten ab Zeile 4
-
-2. **Aktion wählen:**
-   - **"Vollständigkeit prüfen"**: Führt die Qualitätsprüfung durch
-   - **"Websuche"**: Echo-Funktion (gibt Datei unverändert zurück)
-
-3. **Ergebnis herunterladen:**
-   - Nach der Verarbeitung erscheint der Download-Button
-   - Excel-Datei mit den Ergebnissen wird heruntergeladen
-
-## Projektstruktur
-
+### Spaltenblöcke
 ```
-clickbot-completeness-app/
-├── server.js              # Hauptserver mit Express-Routen
-├── completeness-checker.js # Vollständigkeitsprüfung-Logik
-├── index.html             # Web-Oberfläche
-├── package.json           # Abhängigkeiten und Skripte
-├── .gitignore            # Git-Ignore-Datei
-└── README.md             # Diese Datei
+A: Produkt-ID (A2V)
+C-D: Materialkurztext (DB | Web)
+E-F: Her.-Artikelnummer (DB | Web)
+G-H: Fert./Prüfhinweis (DB | Web)
+I-J: Werkstoff (DB | Web)
+K-L: Nettogewicht (DB | Web)
+M-N: Länge (DB | Web)
+O-P: Breite (DB | Web)
+Q-R: Höhe (DB | Web)
 ```
 
-## Technische Details
+### Vergleichslogik
+- **Materialkurztext**: Exakte String-Gleichheit
+- **Her.-Artikelnummer**: Normalisierte Artikelnummer-Vergleiche
+- **Werkstoff**: Exakte String-Gleichheit
+- **Nettogewicht**: Exakte Zahlen-Gleichheit in kg
+- **Abmessungen**: Exakte Integer-Gleichheit in mm
 
-- **Backend**: Node.js mit Express
-- **Excel-Verarbeitung**: ExcelJS-Bibliothek
-- **Datei-Upload**: Multer
-- **Frontend**: Vanilla HTML/JavaScript mit Drag & Drop
-- **Port**: Standardmäßig 3000 (konfigurierbar über Umgebungsvariable PORT)
+### Web-Daten-Extraktion
+- **Produkttitel** → Materialkurztext (Web)
+- **Weitere Artikelnummer** → Her.-Artikelnummer (Web)
+- **Werkstoff** → Werkstoff (Web)
+- **Gewicht** → Nettogewicht (Web) in kg
+- **Abmessungen** → Länge/Breite/Höhe (Web) in mm
 
-## Anforderungen an Excel-Dateien
+## 📋 Anforderungen
 
-- **Format**: .xlsx (Excel 2007+)
-- **Header**: Muss in Zeile 3 stehen
-- **Daten**: Beginnen ab Zeile 4
-- **Erwartete Spalten** (für Vollständigkeitsprüfung):
-  - Fert./Prüfhinweis
-  - Länge, Breite, Höhe
-  - Materialkurztext
-  - Gewicht (optional)
+- Node.js >= 18
+- Excel-Dateien mit A2V-Nummern
+- Internetverbindung für MyMobase-Scraping
 
-## Deployment
+## 🛠️ Lokale Installation
 
-Für GitHub Pages oder andere statische Hosting-Dienste:
-1. `npm run build` (falls verfügbar)
-2. Nur die statischen Dateien hochladen
-3. Backend-Funktionalität benötigt einen Node.js-Server
+```bash
+git clone <repository-url>
+cd qmp-siemens-produktcheck-main
+npm install
+npm start
+```
 
-## Lizenz
+Das Tool läuft dann unter `http://localhost:3000`
 
-Private Verwendung - nicht für kommerzielle Zwecke bestimmt.
+## 🚀 Deployment auf Render
+
+### 1. GitHub Repository vorbereiten
+```bash
+git add .
+git commit -m "QMP Siemens Produktcheck v2.1 - Neues Layout mit Spaltenblöcken"
+git push origin main
+```
+
+### 2. Render Service erstellen
+1. Gehen Sie zu [render.com](https://render.com)
+2. Klicken Sie auf "New +" → "Web Service"
+3. Verbinden Sie Ihr GitHub Repository
+4. Konfigurieren Sie den Service:
+   - **Name**: `qmp-siemens-produktcheck`
+   - **Environment**: `Node`
+   - **Build Command**: `npm install && npm run install-browsers`
+   - **Start Command**: `node server.js`
+   - **Plan**: `Starter` (oder höher)
+
+### 3. Umgebungsvariablen setzen
+- `SCRAPE_CONCURRENCY`: `4`
+- `NODE_VERSION`: `18`
+- `DISABLE_PLAYWRIGHT`: `0`
+
+### 4. Deploy
+- Klicken Sie auf "Create Web Service"
+- Render baut und deployed automatisch
+- Die URL wird nach dem Build angezeigt
+
+## 🧪 Testen
+
+### Test-Excel erstellen
+```bash
+node test-excel.js
+```
+
+### Test-Datei verwenden
+1. Öffnen Sie die Web-Oberfläche
+2. Laden Sie `test-input.xlsx` hoch
+3. Klicken Sie auf "Verarbeiten"
+4. Laden Sie das Ergebnis herunter
+
+## 📝 Changelog
+
+### Version 2.1
+- ✅ Neues Layout mit Spaltenblöcken
+- ✅ Keine zusätzlichen Zeilen mehr
+- ✅ Exakte Vergleiche ohne Toleranz
+- ✅ Verbesserte Farbkodierung (Grün/Rot/Orange)
+- ✅ Dynamische Spaltenerkennung
+- ✅ Optimierte Web-Daten-Extraktion
+- ✅ Render-Deployment optimiert
+- ✅ Verbessertes Error-Handling
+
+### Version 2.0
+- Grundlegende Funktionalität
+- Excel-Verarbeitung
+- MyMobase-Scraping
+- Einfache Vergleiche
+
+## 🔍 Troubleshooting
+
+### HTTP 500 Fehler
+- Überprüfen Sie die Render-Logs
+- Stellen Sie sicher, dass alle Abhängigkeiten installiert sind
+- Überprüfen Sie die Excel-Datei auf korrekte Struktur
+
+### Spaltenblöcke werden nicht erstellt
+- Überprüfen Sie die Header-Zeile (Zeile 3)
+- Stellen Sie sicher, dass A2V-Nummern in der Produkt-ID-Spalte stehen
+- Überprüfen Sie die Render-Logs für Details
+
+## 🤝 Support
+
+Bei Fragen oder Problemen:
+1. Überprüfen Sie die Render-Logs
+2. Testen Sie mit der Test-Excel-Datei
+3. Wenden Sie sich an das Entwicklungsteam 
