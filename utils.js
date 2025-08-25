@@ -1,16 +1,18 @@
 /* utils.js */
-const { parseFloat } = require('mathjs');
 
-// Konvertiert einen Wert zu einer Zahl
+// Konvertiert einen Wert zu einer Zahl (ohne mathjs)
 function toNumber(v) {
   if (v == null || v === '') return null;
-  const n = parseFloat(String(v).replace(',', '.'));
+  const str = String(v).replace(',', '.');
+  const n = parseFloat(str);
   return isFinite(n) ? n : null;
 }
 
 // Parst Gewichtswerte aus verschiedenen Formaten
 function parseWeight(weightText) {
-  if (!weightText || typeof weightText !== 'string') return { value: null, unit: null };
+  if (!weightText || typeof weightText !== 'string') {
+    return { value: null, unit: null };
+  }
   
   const text = weightText.trim();
   
@@ -53,13 +55,15 @@ function weightToKg(value, unit) {
     'tonne': 1000
   };
   
-  const multiplier = unitMap[unit] || 1;
+  const multiplier = unitMap[unit.toLowerCase()] || 1;
   return value * multiplier;
 }
 
 // Parst Dimensionen (Länge x Breite x Höhe) aus Text
 function parseDimensionsToLBH(dimText) {
-  if (!dimText || typeof dimText !== 'string') return { L: null, B: null, H: null };
+  if (!dimText || typeof dimText !== 'string') {
+    return { L: null, B: null, H: null };
+  }
   
   const text = dimText.trim();
   
@@ -75,7 +79,10 @@ function parseDimensionsToLBH(dimText) {
   for (const pattern of patterns) {
     const match = text.match(pattern);
     if (match) {
-      const values = match.slice(1).map(v => parseFloat(v.replace(',', '.')));
+      const values = match.slice(1).map(v => {
+        const num = parseFloat(v.replace(',', '.'));
+        return isFinite(num) ? num : null;
+      }).filter(v => v !== null);
       
       if (values.length === 3) {
         return { L: values[0], B: values[1], H: values[2] };
@@ -108,7 +115,7 @@ function mapMaterialClassificationToExcel(classification) {
   
   const mapping = {
     'Kunststoff': 'K',
-    'Metall': 'M',
+    'Metall': 'M', 
     'Holz': 'H',
     'Glas': 'G',
     'Keramik': 'C',
@@ -134,4 +141,4 @@ module.exports = {
   normPartNo,
   mapMaterialClassificationToExcel,
   normalizeNCode
-}; 
+};
