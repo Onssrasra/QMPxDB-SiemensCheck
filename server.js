@@ -411,6 +411,9 @@ app.post('/api/web-search-stats', upload.single('file'), async (req, res) => {
     let redCount = 0;    // Abweichungen (rot)
     let orangeCount = 0; // Fehlende Web-Werte (orange)
     
+    // Debug: Log all found colors
+    const foundColors = new Set();
+    
     // Count colored cells in web value columns
     const lastRow = ws.lastRow ? ws.lastRow.number : 0;
     for (let r = 5; r <= lastRow; r++) { // Start from row 5 (after labels)
@@ -418,21 +421,32 @@ app.post('/api/web-search-stats', upload.single('file'), async (req, res) => {
         const cell = ws.getCell(r, c);
         if (cell.fill && cell.fill.fgColor) {
           const color = cell.fill.fgColor.argb;
-          if (color === 'FFD5F4E6') { // Green - Übereinstimmung
+          foundColors.add(color);
+          
+          // Check only the specific colors used in the system
+          if (color === 'FFD5F4E6') { // Green - Übereinstimmungen
             greenCount++;
-          } else if (color === 'FFFDEAEA') { // Red - Abweichung
+          } else if (color === 'FFFDEAEA') { // Red - Abweichungen
             redCount++;
-          } else if (color === 'FFFFEAA7') { // Orange - Fehlender Wert
+          } else if (color === 'FFFFEAA7') { // Orange - Fehlende Web-Werte
             orangeCount++;
           }
         }
       }
     }
     
+    console.log('Found colors in Excel:', Array.from(foundColors));
+    console.log('Counts:', { green: greenCount, red: redCount, orange: orangeCount });
+    
     res.json({
       green: greenCount,
       red: redCount,
-      orange: orangeCount
+      orange: orangeCount,
+      debug: {
+        foundColors: Array.from(foundColors),
+        totalRows: lastRow,
+        totalColumns: ws.columnCount
+      }
     });
 
   } catch (err) {

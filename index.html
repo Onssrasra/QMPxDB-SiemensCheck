@@ -585,6 +585,12 @@
             foundCount.textContent = stats.green;
             diffCount.textContent = stats.red;
             missingCount.textContent = stats.orange;
+            
+            // Debug info in console
+            if (stats.debug) {
+              console.log('Debug info:', stats.debug);
+              console.log('Found colors:', stats.debug.foundColors);
+            }
           } else {
             // Fallback to placeholder stats
             foundCount.textContent = '?';
