@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Siemens Produktdaten – Pipeline</title>
+  <title>Siemens Produktdaten — Pipeline</title>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
@@ -137,7 +137,7 @@
       color: var(--grey-4);
     }
 
-    /* Dropzone */
+    /* Dropzone - kompakter */
     .dropzone {
       border: 2px dashed var(--grey-3);
       border-radius: 10px;
@@ -540,7 +540,7 @@
       enableSection(qualitySection, true);
       qualityCheckBtn.disabled = false;
       
-      statusEl.textContent = 'Datei erfolgreich hochgeladen – Web-Suche starten oder direkt zur Qualitätsprüfung.';
+      statusEl.textContent = 'Datei erfolgreich hochgeladen — Web-Suche starten oder direkt zur Qualitätsprüfung.';
     }
 
     /* ==================== WEB SEARCH ==================== */
@@ -551,7 +551,7 @@
       downloadWebBtn.disabled = true;
       webStats.classList.add('hidden');
       
-      statusEl.textContent = 'Web-Suche läuft – A2V Nummern werden gescraped...';
+      statusEl.textContent = 'Web-Suche läuft — A2V Nummern werden gescraped...';
       showProgress(true);
       updateProgress(10);
 
@@ -564,10 +564,7 @@
           body: form 
         });
         
-        if (!resp.ok) {
-          const errorText = await resp.text();
-          throw new Error(`HTTP ${resp.status}: ${errorText}`);
-        }
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
 
         updateProgress(50);
         
@@ -583,7 +580,7 @@
         webStats.classList.remove('hidden');
         
         updateProgress(100);
-        statusEl.textContent = 'Web-Suche abgeschlossen – Ergebnis herunterladen oder zur Qualitätsprüfung.';
+        statusEl.textContent = 'Web-Suche abgeschlossen — Ergebnis herunterladen oder zur Qualitätsprüfung.';
         
         downloadWebBtn.disabled = false;
         updateStep(2, 'completed');
@@ -602,9 +599,8 @@
       if (!selectedFile) return;
       
       qualityBlob = null;
-      downloadQualityBtn.disabled = true;
       
-      statusEl.textContent = 'Qualitätsprüfung läuft – Vollständigkeit und Richtigkeit werden geprüft...';
+      statusEl.textContent = 'Qualitätsprüfung läuft — Vollständigkeit und Richtigkeit werden geprüft...';
       showProgress(true);
       updateProgress(20);
 
@@ -630,7 +626,7 @@
         });
         
         updateProgress(100);
-        statusEl.textContent = 'Qualitätsprüfung abgeschlossen – Qualitätsbericht verfügbar.';
+        statusEl.textContent = 'Qualitätsprüfung abgeschlossen — Qualitätsbericht verfügbar.';
         
         downloadQualityBtn.disabled = false;
         updateStep(3, 'completed');
