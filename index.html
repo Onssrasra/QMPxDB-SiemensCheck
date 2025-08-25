@@ -321,15 +321,15 @@
         <div id="webStats" class="stats-grid hidden">
           <div class="stat-card green">
             <div class="stat-number" id="foundCount">0</div>
-            <div class="stat-label">Gefundene Web-Werte</div>
-          </div>
-          <div class="stat-card orange">
-            <div class="stat-number" id="missingCount">0</div>
-            <div class="stat-label">Fehlende Web-Werte</div>
+            <div class="stat-label">Übereinstimmungen (grün)</div>
           </div>
           <div class="stat-card red">
             <div class="stat-number" id="diffCount">0</div>
-            <div class="stat-label">Abweichungen</div>
+            <div class="stat-label">Abweichungen (rot)</div>
+          </div>
+          <div class="stat-card orange">
+            <div class="stat-number" id="missingCount">0</div>
+            <div class="stat-label">Fehlende Web-Werte (orange)</div>
           </div>
         </div>
       </div>
@@ -472,10 +472,36 @@
           type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         });
         
-        // Mock stats for now (since we don't have real web search)
-        foundCount.textContent = '42';
-        missingCount.textContent = '8';
-        diffCount.textContent = '3';
+        // Parse Excel to get real statistics
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(buf);
+        const worksheet = workbook.worksheets[0];
+        
+        let greenCount = 0;  // Übereinstimmungen (grün)
+        let redCount = 0;    // Abweichungen (rot)
+        let orangeCount = 0; // Fehlende Web-Werte (orange)
+        
+        // Count colored cells in web value columns
+        const lastRow = worksheet.lastRow ? worksheet.lastRow.number : 0;
+        for (let r = 5; r <= lastRow; r++) { // Start from row 5 (after labels)
+          for (let c = 1; c <= worksheet.columnCount; c++) {
+            const cell = worksheet.getCell(r, c);
+            if (cell.fill && cell.fill.fgColor) {
+              const color = cell.fill.fgColor.argb;
+              if (color === 'FFD5F4E6') { // Green - Übereinstimmung
+                greenCount++;
+              } else if (color === 'FFFDEAEA') { // Red - Abweichung
+                redCount++;
+              } else if (color === 'FFFFEAA7') { // Orange - Fehlender Wert
+                orangeCount++;
+              }
+            }
+          }
+        }
+        
+        foundCount.textContent = greenCount;
+        diffCount.textContent = redCount;
+        missingCount.textContent = orangeCount;
         webStats.classList.remove('hidden');
         
         updateProgress(100);

@@ -86,6 +86,32 @@ function cloneWorksheetValues(src, dst){
   }
 }
 
+/** Apply correct header structure for Qualitätsbericht */
+function applyQualitaetsberichtHeaders(ws) {
+  // Zeile 1: B1:X1 - "DB AG SAP R/3 K MARA Stammdaten Stand 20.Mai 2025"
+  try {
+    ws.unMergeCells('B1:X1');
+  } catch (e) {}
+  ws.mergeCells('B1:X1');
+  const b1 = ws.getCell('B1');
+  b1.value = 'DB AG SAP R/3 K MARA Stammdaten Stand 20.Mai 2025';
+  b1.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  
+  // Zeile 1: Y1 - "SAP Klassifizierung aus Okt24"
+  const y1 = ws.getCell('Y1');
+  y1.value = 'SAP Klassifizierung aus Okt24';
+  y1.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  
+  // Zeile 1: Z1:AB1 - "Zusatz Herstellerdaten aus Abfragen in 2024"
+  try {
+    ws.unMergeCells('Z1:AB1');
+  } catch (e) {}
+  ws.mergeCells('Z1:AB1');
+  const z1 = ws.getCell('Z1');
+  z1.value = 'Zusatz Herstellerdaten aus Abfragen in 2024';
+  z1.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+}
+
 /** Find column index by header name in HEADER_ROW (exact match after trim) */
 function colByHeader(ws, name){
   const hdr = ws.getRow(HEADER_ROW);
@@ -115,6 +141,9 @@ async function checkCompleteness(fileBuffer) {
 
   // Clone original values to Qualitätsbericht to preserve structure (no subheaders/structure changes)
   cloneWorksheetValues(src, wsQ);
+  
+  // Apply correct header structure for Qualitätsbericht
+  applyQualitaetsberichtHeaders(wsQ);
 
   // Map column indexes by header name (from row 3)
   const cFert = colByHeader(src, 'Fert./Prüfhinweis');
