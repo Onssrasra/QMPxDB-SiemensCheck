@@ -43,7 +43,7 @@ function validFertPruef(v){
   return POS1.has(parts[0]) && POS2.has(parts[1]) && POS3.has(parts[2]) && POS4.has(parts[3]) && POS5.has(parts[4]);
 }
 
-/** Utility: copy entire worksheet values (no styles) to a new sheet */
+/** Utility: copy entire worksheet values and formatting for first 3 rows */
 function cloneWorksheetValues(src, dst){
   // Copy column widths
   for (let c=1; c<=src.columnCount; c++){
@@ -51,25 +51,36 @@ function cloneWorksheetValues(src, dst){
     if (w) dst.getColumn(c).width = w;
   }
   
-  // Copy all rows' values 1:1 - including the first row (Zeile 1)
+  // Copy all rows' values 1:1
   const last = src.lastRow ? src.lastRow.number : src.rowCount;
   for (let r=1; r<=last; r++){
     const sRow = src.getRow(r);
     const dRow = dst.getRow(r);
     dRow.values = sRow.values;
     
-    // Preserve cell formatting for the first row especially
-    if (r === 1) {
+    // Preserve ALL formatting for the first 3 rows (Zeile 1, 2, 3)
+    if (r <= 3) {
       for (let c=1; c<=sRow.cellCount; c++){
         const srcCell = sRow.getCell(c);
         const dstCell = dRow.getCell(c);
         
-        // Copy formatting properties
+        // Copy ALL formatting properties
         if (srcCell.fill) dstCell.fill = srcCell.fill;
         if (srcCell.font) dstCell.font = srcCell.font;
         if (srcCell.border) dstCell.border = srcCell.border;
         if (srcCell.alignment) dstCell.alignment = srcCell.alignment;
         if (srcCell.numFmt) dstCell.numFmt = srcCell.numFmt;
+        if (srcCell.style) dstCell.style = srcCell.style;
+        
+        // Copy merged cells if they exist
+        if (srcCell.master && srcCell.master.address) {
+          try {
+            const masterAddr = srcCell.master.address;
+            dst.mergeCells(masterAddr);
+          } catch (e) {
+            // Ignore merge errors
+          }
+        }
       }
     }
   }
