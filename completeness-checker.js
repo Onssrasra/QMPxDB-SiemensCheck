@@ -204,7 +204,7 @@ async function checkCompleteness(fileBuffer) {
       }
     }
 
-    // 4) Gewicht <= 0 → rot (if present)
+    // 4) Nettogewicht <= 0 → rot (nur diese Spalte)
     if (cGew){
       const g = toNum(rowS.getCell(cGew).value);
       if (g != null && g <= 0){
@@ -213,7 +213,7 @@ async function checkCompleteness(fileBuffer) {
       }
     }
     
-    // 5) Bruttogewicht <= 0 → rot (if present)
+    // 5) Bruttogewicht <= 0 → rot (nur diese Spalte)
     if (cBrutto){
       const bg = toNum(rowS.getCell(cBrutto).value);
       if (bg != null && bg <= 0){
@@ -222,13 +222,14 @@ async function checkCompleteness(fileBuffer) {
       }
     }
     
-    // 6) Bruttogewicht < Nettogewicht → rot (wenn beide vorhanden)
+    // 6) Bruttogewicht < Nettogewicht → rot (nur die falsche Spalte)
     if (cBrutto && cGew){
       const bg = toNum(rowS.getCell(cBrutto).value);
       const ng = toNum(rowS.getCell(cGew).value);
       if (bg != null && ng != null && bg < ng){
+        // Nur die Spalte markieren, die den falschen Wert hat
+        // Wenn Bruttogewicht kleiner als Nettogewicht, dann ist Bruttogewicht falsch
         rowQ.getCell(cBrutto).fill = FILL_RED;
-        rowQ.getCell(cGew).fill = FILL_RED;
         hasRed = true;
       }
     }
